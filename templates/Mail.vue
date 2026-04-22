@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import interact from 'interactjs';
 import {
     onMounted,
+    onBeforeUnmount,
     ref,
-    defineProps,
     computed
 } from 'vue';
 import {
@@ -12,31 +12,34 @@ import {
 import {
     useMailStore
 } from '@/stores/mail'
+import { useContent } from '@/composables/useContent'
+import { useImagePath } from '@/composables/useImagePath'
+import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
 
-const props = defineProps({
-    windowId: String,
-    nameOfWindow: String,
-    content_padding_left: {
-        required: false,
-        type: String,
-        default: "15%",
+const { site } = useContent()
+const { iconPath } = useImagePath()
+const runtimeConfig = useRuntimeConfig()
+const mailFormAction = runtimeConfig.public.mailFormAction
+const mailEntrySubject = runtimeConfig.public.mailEntrySubject
+const mailEntrySender = runtimeConfig.public.mailEntrySender
+const mailEntryContent = runtimeConfig.public.mailEntryContent
+
+const props = withDefaults(
+    defineProps<{
+        windowId?: string
+        nameOfWindow?: string
+        contentPaddingLeft?: string
+        contentPaddingRight?: string
+        contentPaddingTop?: string
+        contentPaddingBottom?: string
+    }>(),
+    {
+        contentPaddingLeft: '15%',
+        contentPaddingRight: '15%',
+        contentPaddingTop: '5%',
+        contentPaddingBottom: '5%',
     },
-    content_padding_right: {
-        required: false,
-        type: String,
-        default: "15%",
-    },
-    content_padding_top: {
-        required: false,
-        type: String,
-        default: "5%",
-    },
-    content_padding_bottom: {
-        required: false,
-        type: String,
-        default: "5%",
-    },
-})
+)
 
 const position = ref({
     x: 0,
@@ -57,11 +60,11 @@ const style = computed(() => ({
     height: `${h.value}px`,
     width: `${w.value}px`,
     transform: `translate(${position.value.x}px, ${position.value.y}px)`,
-    "--content-padding-left": props.content_padding_left || "15%",
-    "--content-padding-right": props.content_padding_right || "15%",
-    "--content-padding-top": props.content_padding_top || "5%",
-    "--content-padding-bottom": props.content_padding_bottom || "5%",
-    "--fullscreen": windowsStore.getFullscreenWindowHeight, 
+    "--content-padding-left": props.contentPaddingLeft || "15%",
+    "--content-padding-right": props.contentPaddingRight || "15%",
+    "--content-padding-top": props.contentPaddingTop || "5%",
+    "--content-padding-bottom": props.contentPaddingBottom || "5%",
+    "--fullscreen": windowsStore.getFullscreenWindowHeight,
 }));
 
 const setActiveWindow = () => {
@@ -111,74 +114,52 @@ const closeWindow = () => {
     windowsStore.setWindowState(payload)
 }
 
-const getImagePath = (iconImage) => {
-    const path = `../assets/win95Icons/${iconImage}`;
-    const modules =
-        import.meta.glob("../assets/win95Icons/*", {
-            eager: true
-        });
-    const mod = modules[path]
-    if (mod == undefined) {
-        return ""
-    } else {
-        return mod.default;
-    }
-};
+let sendTimeout: ReturnType<typeof setTimeout> | null = null
 
-const checkMail = () => {
-    if (mailStore.mailSubject == "New Message") {
-        return ""
-    } else {
-        return mailStore.mailSubject
-    }
-}
+const mailSubject = computed({
+    get: () => mailStore.mailSubject,
+    set: (v: string) => {
+        mailStore.setMailSubject(v.replace(/\s/g, '') === '' ? 'New Message' : v)
+    },
+})
+
+const mailSender = computed({
+    get: () => mailStore.mailSender,
+    set: (v: string) => mailStore.setMailSender(v),
+})
+
+const mailContent = computed({
+    get: () => mailStore.mailContent,
+    set: (v: string) => mailStore.setMailContent(v),
+})
 
 const sendEmail = () => {
-    setTimeout(() => {
+    if (sendTimeout) clearTimeout(sendTimeout)
+    sendTimeout = setTimeout(() => {
+        sendTimeout = null
         closeWindow()
-        mailStore.setMailSubject("")
-        mailStore.setMailSender("")
-        mailStore.setMailContent("")
+        mailStore.resetMail()
         alert("Email Sent!")
     }, 500)
 }
 
-const onChangeMailSubject = (e) => {
-    if (e.target.value.replace(/\s/g, '') == "") {
-        mailStore.setMailSubject("New Message")
-    } else {
-        mailStore.setMailSubject(e.target.value)
-    }
-}
-
-const onChangeMailSender = (e) => {
-    if (e.target.value.replace(/\s/g, '') == "") {
-        mailStore.setMailSender("")
-    } else {
-        mailStore.setMailSender(e.target.value)
-    }
-}
-
-const onChangeMailContent = (e) => {
-    if (e.target.value.replace(/\s/g, '') == "") {
-        mailStore.setMailContent("")
-    } else {
-        mailStore.setMailContent(e.target.value)
-    }
-}
-
 let isDragging = false;
+let draggableWindow = null;
 
 onMounted(() => {
     window.value = windowsStore.getWindowById(ComponentName)
-    const draggableWindow = interact("#" + window.value.windowId)
+    if (!window.value) return
+    const screen = document.getElementById('screen')
+    const screenWidth = screen ? screen.clientWidth : SCREEN_FALLBACK_SIZE_PX
+    const screenHeight = screen ? screen.clientHeight : SCREEN_FALLBACK_SIZE_PX
+
+    draggableWindow = interact("#" + window.value.windowId)
     draggableWindow
         .draggable({
             listeners: {
                 move(event) {
                     position.value.x += event.dx
                     position.value.y += event.dy
-                    // event.target.style.transform = `translate(${position.value.x}px, ${position.value.y}px)`
                 }
             },
             modifiers: [
@@ -195,7 +176,6 @@ onMounted(() => {
         .on('dragmove', () => {
             if (isDragging) {
                 setActiveWindow();
-                // windowsStore.zIndexIncrement(window.value.windowId);
                 isDragging = false;
             }
         })
@@ -223,16 +203,24 @@ onMounted(() => {
             modifiers: [
                 interact.modifiers.restrictSize({
                     min: {
-                        width: 400,
-                        height: 400
+                        width: WINDOW_MIN_SIZE_PX,
+                        height: WINDOW_MIN_SIZE_PX
                     },
                     max: {
-                        width: document.getElementById('screen').clientWidth - position.value.x,
-                        height: document.getElementById('screen').clientHeight - position.value.y
+                        width: screenWidth - position.value.x,
+                        height: screenHeight - position.value.y
                     }
                 }),
             ],
         })
+})
+
+onBeforeUnmount(() => {
+    if (draggableWindow) draggableWindow.unset()
+    if (sendTimeout) {
+        clearTimeout(sendTimeout)
+        sendTimeout = null
+    }
 })
 </script>
 
@@ -242,14 +230,14 @@ onMounted(() => {
             'minimize': window.fullscreen == 'minimize',
         }" @click="setActiveWindow" @dragstart="setActiveWindow" @click.native="setActiveWindow">
     <iframe name="hidden_iframe" id="hidden_iframe" style="display: none"></iframe>
-    <form @submit="sendEmail" action="https://docs.google.com/forms/u/0/d/e/1FAIpQLSdRBqHB0Z6GOjwE3jniX8-fHfJK-WcyzNTmkPFg4fg2SYPwpA/formResponse" class="window-style" id="container" target="hidden_iframe">
+    <form @submit="sendEmail" :action="mailFormAction" class="window-style" id="container" target="hidden_iframe">
         <div id="top-bar" class="top-bar-window" :class="
             windowsStore.activeWindow == window.windowId
                 ? 'top-bar'
                 : 'top-bar-deactivated'
             " @dblclick="toggleWindowSize">
             <div class="window-name">
-                <img class="icon-image" :src="getImagePath(window.iconImage)" :alt="window.altText" />{{ window.displayName }}
+                <img class="icon-image" :src="iconPath(window.iconImage)" :alt="window.altText" />{{ window.displayName }}
             </div>
             <div class="triple-button">
                 <button class="minimize-button button" @click="minimizeWindow">
@@ -295,21 +283,21 @@ onMounted(() => {
                 <hr />
                 <div class="subject-container">
                     <p style="margin: 8px">To:</p>
-                    <div class="receipient">Don</div>
+                    <div class="receipient">{{ site.mailRecipientLabel }}</div>
                 </div>
                 <hr />
                 <div class="subject-container">
                     <p style="margin: 8px">Subject:</p>
-                    <input name="entry.609946071" class="subject" v-model="mailSubject" v-on:input="onChangeMailSubject" type="text" required="true" />
+                    <input :name="mailEntrySubject" class="subject" v-model="mailSubject" type="text" required="true" />
                 </div>
                 <hr />
                 <div class="from-container" style="margin-bottom: 2px">
                     <p style="margin: 8px">From:</p>
-                    <input name="entry.367924729" class="subject" v-model="mailSender" v-on:input="onChangeMailSender" type="email" required="true" />
+                    <input :name="mailEntrySender" class="subject" v-model="mailSender" type="email" required="true" />
                 </div>
             </div>
 
-            <textarea name="entry.863594021" v-model="mailContent" v-on:input="onChangeMailContent" required="true"></textarea>
+            <textarea :name="mailEntryContent" v-model="mailContent" required="true"></textarea>
         </div>
     </form>
 </div>
@@ -441,7 +429,6 @@ hr {
     background: repeating-conic-gradient(rgb(189, 190, 189) 0% 25%,
             rgb(255, 255, 255) 0% 50%) 50% / 2px 2px;
     border-top: solid rgb(0, 0, 0) 1.5px;
-    /* border-left: solid rgb(0, 0, 0) 1.5px; */
     border-bottom: solid rgb(250, 250, 250) 1.5px;
     border-right: solid rgb(250, 250, 250) 1.5px;
 }
@@ -524,7 +511,6 @@ textarea {
     resize: none;
     caret-color: black;
     color: black;
-    /* font-family: Avenir, Helvetica, Arial, sans-serif; */
     font-size: 14px;
     border-radius: 0;
     flex-grow: 1;
