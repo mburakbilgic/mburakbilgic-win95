@@ -1,39 +1,33 @@
-<script setup>
+<script setup lang="ts">
 import interact from 'interactjs';
 import {
     onMounted,
+    onBeforeUnmount,
     ref,
-    defineProps,
-    computed
+    computed,
+    watch
 } from 'vue';
 import {
     useWindowsStore
 } from '@/stores/windows'
+import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
 
-const props = defineProps({
-    windowId: String,
-    nameOfWindow: String,
-    content_padding_left: {
-        required: false,
-        type: String,
-        default: "15%",
+const props = withDefaults(
+    defineProps<{
+        windowId?: string
+        nameOfWindow?: string
+        contentPaddingLeft?: string
+        contentPaddingRight?: string
+        contentPaddingTop?: string
+        contentPaddingBottom?: string
+    }>(),
+    {
+        contentPaddingLeft: '15%',
+        contentPaddingRight: '15%',
+        contentPaddingTop: '5%',
+        contentPaddingBottom: '5%',
     },
-    content_padding_right: {
-        required: false,
-        type: String,
-        default: "15%",
-    },
-    content_padding_top: {
-        required: false,
-        type: String,
-        default: "5%",
-    },
-    content_padding_bottom: {
-        required: false,
-        type: String,
-        default: "5%",
-    }
-})
+)
 
 const position = ref({
     x: 0,
@@ -50,25 +44,30 @@ const w = ref(0)
 const h = ref(0)
 const gridHeight = ref("")
 const fileExplorer = ref(null)
-const files = ref(windowsStore.photoFolderContent)
-const currentIndex = 0
-const file = ref(files.value[currentIndex])
+const files = computed(() => windowsStore.photoFolderContent || [])
+const file = computed(() => files.value[0] || {})
 
 onMounted(() => {
-    let gridH = fileExplorer.value.clientHeight
-    gridHeight.value = gridH + "px"
-    console.log(gridHeight.value)
+    if (fileExplorer.value) {
+        gridHeight.value = fileExplorer.value.clientHeight + "px"
+    }
+})
+
+watch(() => windowsStore.photoFolderContent, () => {
+    if (fileExplorer.value) {
+        gridHeight.value = fileExplorer.value.clientHeight + "px"
+    }
 })
 
 const style = computed(() => ({
     height: `${h.value}px`,
     width: `${w.value}px`,
     transform: `translate(${position.value.x}px, ${position.value.y}px)`,
-    "--content-padding-left": props.content_padding_left || "15%",
-    "--content-padding-right": props.content_padding_right || "15%",
-    "--content-padding-top": props.content_padding_top || "5%",
-    "--content-padding-bottom": props.content_padding_bottom || "5%",
-    "--fullscreen": windowsStore.getFullscreenWindowHeight, // assuming this is a method in your store
+    "--content-padding-left": props.contentPaddingLeft || "15%",
+    "--content-padding-right": props.contentPaddingRight || "15%",
+    "--content-padding-top": props.contentPaddingTop || "5%",
+    "--content-padding-bottom": props.contentPaddingBottom || "5%",
+    "--fullscreen": windowsStore.getFullscreenWindowHeight,
 }));
 
 const setActiveWindow = () => {
@@ -118,32 +117,23 @@ const closeWindow = () => {
     windowsStore.setWindowState(payload)
 }
 
-const getImagePath = (iconImage) => {
-    const path = `../assets/win95Icons/${iconImage}`;
-    const modules =
-        import.meta.glob("../assets/win95Icons/*", {
-            eager: true
-        });
-    const mod = modules[path]
-    if (mod == undefined) {
-        return ""
-    } else {
-        return mod.default;
-    }
-};
-
 let isDragging = false;
+let draggableWindow = null;
 
 onMounted(() => {
     window.value = windowsStore.getWindowById(ComponentName)
-    const draggableWindow = interact("#" + window.value.windowId)
+    if (!window.value) return
+    const screen = document.getElementById('screen')
+    const screenWidth = screen ? screen.clientWidth : SCREEN_FALLBACK_SIZE_PX
+    const screenHeight = screen ? screen.clientHeight : SCREEN_FALLBACK_SIZE_PX
+
+    draggableWindow = interact("#" + window.value.windowId)
     draggableWindow
         .draggable({
             listeners: {
                 move(event) {
                     position.value.x += event.dx
                     position.value.y += event.dy
-                    // event.target.style.transform = `translate(${position.value.x}px, ${position.value.y}px)`
                 }
             },
             modifiers: [
@@ -160,7 +150,6 @@ onMounted(() => {
         .on('dragmove', () => {
             if (isDragging) {
                 setActiveWindow();
-                // windowsStore.zIndexIncrement(window.value.windowId);
                 isDragging = false;
             }
         })
@@ -188,16 +177,20 @@ onMounted(() => {
             modifiers: [
                 interact.modifiers.restrictSize({
                     min: {
-                        width: 400,
-                        height: 400
+                        width: WINDOW_MIN_SIZE_PX,
+                        height: WINDOW_MIN_SIZE_PX
                     },
                     max: {
-                        width: document.getElementById('screen').clientWidth - position.value.x,
-                        height: document.getElementById('screen').clientHeight - position.value.y
+                        width: screenWidth - position.value.x,
+                        height: screenHeight - position.value.y
                     }
                 }),
             ],
         })
+})
+
+onBeforeUnmount(() => {
+    if (draggableWindow) draggableWindow.unset()
 })
 </script>
 
@@ -254,12 +247,8 @@ onMounted(() => {
             </div>
         </div>
 
-        <div v-if="file.type == 'file'" class="file-explorer !h-[95%] !w-[100%]" style="width: 100%;"  ref="fileExplorer" :style="{ height: gridHeight }">
-            <!-- <div class="iframe-container"> -->
-                <iframe class="mx-auto responsive-iframe w-[100%]" height="100%" :src="file.content.src"  />
-            <!-- </div> -->
-            <!-- <VuePdfEmbed height="100%" width="100%" :source="file.content.src" /> -->
-            <!-- <VuePDF :pdf="file.content.src" /> -->
+        <div v-if="file.type == 'file'" class="file-explorer !h-[95%] !w-[100%]" style="width: 100%;" ref="fileExplorer" :style="{ height: gridHeight }">
+            <iframe class="mx-auto responsive-iframe w-[100%]" height="100%" :src="file.content.src" />
         </div>
 
         <div v-else class="file-explorer" ref="fileExplorer">
@@ -267,13 +256,6 @@ onMounted(() => {
                 <img :src="file.src" />
             </div>
         </div>
-
-        <!-- <div class="bottom-bar">
-            <div class="left-bar bar">{{ files.length }} object(s)</div>
-            <div class="right-bar bar">
-                {{ convertBytestoMegabytes(size) }}
-            </div>
-        </div> -->
     </div>
 </div>
 </template>
@@ -324,19 +306,10 @@ onMounted(() => {
     margin-bottom: 5px;
 }
 
-.iframe-container {
-    
-}
-
-.responsive-iframe {
-   
-}
-
 .grid-container-photos {
     display: flex;
     justify-content: center;
     align-items: center;
-    /* height: 0 !important; */
 }
 
 .file-explorer {
@@ -350,7 +323,6 @@ onMounted(() => {
     width: auto;
     z-index: 10;
     margin: 2px;
-    /* padding: 2px 2px 2px 2px; */
     overflow-y: hidden;
 }
 

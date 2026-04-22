@@ -6,15 +6,15 @@ import Navbar from './templates/Navbar.vue'
 import AppGrid from './templates/AppGrid.vue'
 import Bio from './views/Bio.vue'
 import Resume from './views/Resume.vue'
-import Nossaflex from './views/Nossaflex.vue'
-import Wwdc2021 from './views/Wwdc2021.vue'
-import Wwdc2022 from './views/Wwdc2022.vue'
-import Wwdc2023 from './views/Wwdc2023.vue'
+import TechMonolith from './views/TechMonolith.vue'
 import ImagePreviewWindow from './templates/ImagePreviewWindow.vue'
 import StartMenu from './templates/StartMenu.vue'
+import Projects from './views/Projects.vue'
+import DosReadme from './views/DosReadme.vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
-} from './stores/windows'
+} from '@/stores/windows'
 const windowsStore = useWindowsStore()
 const windows = windowsStore.windows
 
@@ -28,16 +28,14 @@ const windowComponents = [
 const slotViews = [
   { name: 'bio', comp: Bio },
   { name: 'resume', comp: Resume },
-  { name: 'nossaflex', comp: Nossaflex },
-  { name: 'wwdc2021', comp: Wwdc2021 },
-  { name: 'wwdc2022', comp: Wwdc2022 },
-  { name: 'wwdc2023', comp: Wwdc2023 }
+  { name: 'techmonolith', comp: TechMonolith },
+  { name: 'projects', comp: Projects },
+  { name: 'dosReadme', comp: DosReadme },
 ]
 
 const windowCheck = (windowId) => {
-    if (windowsStore.getWindowById(windowId).windowState == "open") {
-        return true
-    } 
+    const win = windowsStore.getWindowById(windowId)
+    return win ? win.windowState === "open" : false
 }
 
 const deinitWindows = () => {
@@ -55,18 +53,24 @@ const openWindow = (windowId) => {
   windowsStore.setWindowState(payload)
 }
 
+const onResize = () => {
+  const vh = window.innerHeight * 0.01
+  document.documentElement.style.setProperty("--vh", `${vh}px`)
+}
+
 onMounted(() => {
-  let navbar = document.getElementById("navbar");
-  let navbarHeight = navbar.clientHeight;
+  const navbar = document.getElementById("navbar")
+  const screen = document.getElementById("screen")
+  if (navbar && screen) {
+    screen.style.height = window.innerHeight - navbar.clientHeight + "px"
+  }
 
-  document.getElementById("screen").style.height =
-  window.innerHeight - navbarHeight + "px";
-
-  window.addEventListener("resize", () => {
-    let vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty("--vh", `${vh}px`);
-  });
+  window.addEventListener("resize", onResize)
   openWindow('BiographyWindow')
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", onResize)
 })
 
 </script>
@@ -74,18 +78,18 @@ onMounted(() => {
 <template>
   <div id="app">
     <div class="screen" id="screen" @click="deinitWindows">
-      <div 
-        v-for="window in windows" 
-        :key="window.key" 
+      <div
+        v-for="window in windows"
+        :key="window.windowId"
         :aria-label="window.displayName"
       >
-          <component 
-            :is="windowComponents.find(comp => comp.name === window.windowComponent).comp"
-            :nameOfWindow="window.windowId" 
-            :content_padding_bottom="window.windowContentPadding['bottom']" 
-            :content_padding_left="window.windowContentPadding['left']" 
-            :content_padding_right="window.windowContentPadding['right']" 
-            :content_padding_top="window.windowContentPadding['top']" 
+          <component
+            :is="(windowComponents.find(comp => comp.name === window.windowComponent) || {}).comp"
+            :nameOfWindow="window.windowId"
+            :contentPaddingBottom="window.windowContentPadding['bottom']"
+            :contentPaddingLeft="window.windowContentPadding['left']"
+            :contentPaddingRight="window.windowContentPadding['right']"
+            :contentPaddingTop="window.windowContentPadding['top']"
             :id="window.windowId" 
             :style="{
                     position: window.position,
@@ -97,7 +101,7 @@ onMounted(() => {
             v-if="windowCheck(window.windowId)" 
           >
           <template v-slot:content>
-            <component :is="slotViews.find(comp => comp.name === window.windowContent).comp"></component>
+            <component :is="(slotViews.find(comp => comp.name === window.windowContent) || {}).comp"></component>
           </template>
           </component>
         </div>
@@ -162,7 +166,6 @@ h6 {
 }
 ::-webkit-scrollbar-thumb {
   background: rgb(189, 190, 189);
-  /* box-shadow: 1.5px 1.5px black; */
   border-top: solid rgb(250, 250, 250) 1.5px;
   border-left: solid rgb(250, 250, 250) 1.5px;
   border-bottom: solid rgb(90, 90, 90) 1.5px;

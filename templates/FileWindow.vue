@@ -1,49 +1,36 @@
-<script setup>
+<script setup lang="ts">
 import interact from 'interactjs';
 import {
     onMounted,
+    onBeforeUnmount,
     ref,
-    defineProps,
     computed
 } from 'vue';
 import {
     useWindowsStore
 } from '@/stores/windows'
+import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
 
-const props = defineProps({
-    windowId: String,
-    nameOfWindow: String,
-    content_padding_left: {
-        required: false,
-        type: String,
-        default: "15%",
+const props = withDefaults(
+    defineProps<{
+        windowId?: string
+        nameOfWindow?: string
+        contentPaddingLeft?: string
+        contentPaddingRight?: string
+        contentPaddingTop?: string
+        contentPaddingBottom?: string
+        folderContent?: Array<Record<string, unknown>>
+        folderSize?: number
+    }>(),
+    {
+        contentPaddingLeft: '15%',
+        contentPaddingRight: '15%',
+        contentPaddingTop: '5%',
+        contentPaddingBottom: '5%',
+        folderContent: () => [],
+        folderSize: 0,
     },
-    content_padding_right: {
-        required: false,
-        type: String,
-        default: "15%",
-    },
-    content_padding_top: {
-        required: false,
-        type: String,
-        default: "5%",
-    },
-    content_padding_bottom: {
-        required: false,
-        type: String,
-        default: "5%",
-    },
-    folderContent: {
-        required: true,
-        type: Array,
-        default: () => [],
-    },
-    folderSize: {
-        required: false,
-        type: Number,
-        default: 0,
-    },
-})
+)
 
 const position = ref({
     x: 0,
@@ -64,20 +51,20 @@ const files = ref(props.folderContent)
 const size = ref(props.folderSize)
 
 onMounted(() => {
-    let gridH = fileExplorer.value.clientHeight
-    gridHeight.value = gridH + "px"
-    console.log(gridHeight.value)
+    if (fileExplorer.value) {
+        gridHeight.value = fileExplorer.value.clientHeight + "px"
+    }
 })
 
 const style = computed(() => ({
     height: `${h.value}px`,
     width: `${w.value}px`,
     transform: `translate(${position.value.x}px, ${position.value.y}px)`,
-    "--content-padding-left": props.content_padding_left || "15%",
-    "--content-padding-right": props.content_padding_right || "15%",
-    "--content-padding-top": props.content_padding_top || "5%",
-    "--content-padding-bottom": props.content_padding_bottom || "5%",
-    "--fullscreen": windowsStore.getFullscreenWindowHeight, // assuming this is a method in your store
+    "--content-padding-left": props.contentPaddingLeft || "15%",
+    "--content-padding-right": props.contentPaddingRight || "15%",
+    "--content-padding-top": props.contentPaddingTop || "5%",
+    "--content-padding-bottom": props.contentPaddingBottom || "5%",
+    "--fullscreen": windowsStore.getFullscreenWindowHeight,
 }));
 
 const setActiveWindow = () => {
@@ -126,20 +113,6 @@ const closeWindow = () => {
     };
     windowsStore.setWindowState(payload)
 }
-
-const getImagePath = (iconImage) => {
-    const path = `../assets/win95Icons/${iconImage}`;
-    const modules =
-        import.meta.glob("../assets/win95Icons/*", {
-            eager: true
-        });
-    const mod = modules[path]
-    if (mod == undefined) {
-        return ""
-    } else {
-        return mod.default;
-    }
-};
 
 const convertBytestoMegabytes = (bytes) => {
     if (bytes !== 0) {
@@ -190,7 +163,7 @@ const openWindow = (file) => {
         windowsStore.pushNewWindow(addWindowPayload)
         windowsStore.setWindowState(openWindowPayload)
     } else if (file.type == "video") {
-        console.log("SKIP")
+        return
     } else {
         const openWindowPayload = {
             windowState: "open",
@@ -198,30 +171,32 @@ const openWindow = (file) => {
         }
         const contentPayload = files.value.slice(files.value.indexOf(file));
         contentPayload.push(...files.value.slice(0, files.value.indexOf(file)));
-        const payload = {
+        windowsStore.setWindowState({
             windowState: "close",
             windowId: "ImagePreviewWindow",
-        }
-        windowsStore.setWindowState(payload)
-        setTimeout(() => {
-            windowsStore.setPhotoFolderContent(contentPayload)
-            windowsStore.setWindowState(openWindowPayload)
         })
+        windowsStore.setPhotoFolderContent(contentPayload)
+        windowsStore.setWindowState(openWindowPayload)
     }
 }
 
 let isDragging = false;
+let draggableWindow = null;
 
 onMounted(() => {
     window.value = windowsStore.getWindowById(ComponentName)
-    const draggableWindow = interact("#" + window.value.windowId)
+    if (!window.value) return
+    const screen = document.getElementById('screen')
+    const screenWidth = screen ? screen.clientWidth : SCREEN_FALLBACK_SIZE_PX
+    const screenHeight = screen ? screen.clientHeight : SCREEN_FALLBACK_SIZE_PX
+
+    draggableWindow = interact("#" + window.value.windowId)
     draggableWindow
         .draggable({
             listeners: {
                 move(event) {
                     position.value.x += event.dx
                     position.value.y += event.dy
-                    // event.target.style.transform = `translate(${position.value.x}px, ${position.value.y}px)`
                 }
             },
             modifiers: [
@@ -238,7 +213,6 @@ onMounted(() => {
         .on('dragmove', () => {
             if (isDragging) {
                 setActiveWindow();
-                // windowsStore.zIndexIncrement(window.value.windowId);
                 isDragging = false;
             }
         })
@@ -266,16 +240,20 @@ onMounted(() => {
             modifiers: [
                 interact.modifiers.restrictSize({
                     min: {
-                        width: 400,
-                        height: 400
+                        width: WINDOW_MIN_SIZE_PX,
+                        height: WINDOW_MIN_SIZE_PX
                     },
                     max: {
-                        width: document.getElementById('screen').clientWidth - position.value.x,
-                        height: document.getElementById('screen').clientHeight - position.value.y
+                        width: screenWidth - position.value.x,
+                        height: screenHeight - position.value.y
                     }
                 }),
             ],
         })
+})
+
+onBeforeUnmount(() => {
+    if (draggableWindow) draggableWindow.unset()
 })
 </script>
 
@@ -335,7 +313,7 @@ onMounted(() => {
         ref="fileExplorer"
         >
         <nav class="grid-container-photos" :style="{ height: gridHeight }">
-            <li v-for="file in files" :key="file.key">
+            <li v-for="file in files" :key="file.id">
                 <button class="icon-photos" @click="setSize(file)" @touchstart="openWindow(file)" @dblclick="openWindow(file)">
                     <img v-if="file.type == 'photo'" class="icon-image-photos"  src="@/assets/FileWindow/image.png" :alt="file.altText" />
                     <img v-else-if="file.type == 'folder'" class="icon-image-photos" src="@/assets/FileWindow/folder.png" :alt="file.altText" />
@@ -363,7 +341,6 @@ onMounted(() => {
 
 <style scoped>
 .icon-text {
-  /* white-space: nowrap; */
   display: block;
   overflow: hidden;
   width: 60px !important;
