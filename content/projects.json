@@ -1,0 +1,42 @@
+[
+  {
+    "id": "clinicaltrials-parsing-tool",
+    "title": "ClinicalTrials Parsing Tool",
+    "owner": "mburakbilgic",
+    "repo": "clinicaltrials-parsing-tool",
+    "branch": "main",
+    "description": "Python utility to scrape & parse data from ClinicalTrials.gov."
+  },
+  {
+    "id": "ollama_mvc_example",
+    "title": "Ollama MVC Example",
+    "owner": "mburakbilgic",
+    "repo": "ollama_mvc_example",
+    "branch": "master",
+    "description": "Example of Ollama and FastAPI usement. December lecture project of ISMEK."
+  },
+  {
+    "id": "nlp-transformers-supervised-example",
+    "title": "NLP Transformers Supervised Example",
+    "owner": "mburakbilgic",
+    "repo": "nlp-transformers-supervised-example",
+    "branch": "master",
+    "description": "Example of NLP and JupyterNotebook usement. December lecture project of ISMEK."
+  },
+  {
+    "id": "vit-cv-example",
+    "title": "ViT CV Example",
+    "owner": "mburakbilgic",
+    "repo": "vit-cv-example",
+    "branch": "master",
+    "description": "Example of visual transformers for CV. December lecture project of ISMEK."
+  },
+  {
+    "id": "hrms",
+    "title": "HRMS JAVA Backend Application",
+    "owner": "mburakbilgic",
+    "repo": "hrms",
+    "branch": "master",
+    "description": "Human Resource Management System"
+  }
+]

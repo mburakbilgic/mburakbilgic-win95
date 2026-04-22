@@ -1,0 +1,46 @@
+{
+  "techBadges": [
+    { "alt": "Git", "src": "https://img.shields.io/badge/-Git-critical" },
+    { "alt": "Python", "src": "https://img.shields.io/badge/-Python-yellow" },
+    { "alt": "CUDA", "src": "https://img.shields.io/badge/CUDA-black" },
+    { "alt": "EdgeTPU", "src": "https://img.shields.io/badge/EdgeTPU-grey" },
+    { "alt": "NLP", "src": "https://img.shields.io/badge/-NLP-lightgrey" },
+    { "alt": "LLM", "src": "https://img.shields.io/badge/-LLM-lightgrey" },
+    { "alt": "Image Processing", "src": "https://img.shields.io/badge/-Image%20Processing-lightgrey" },
+    { "alt": "TensorFlow", "src": "https://img.shields.io/badge/-TensorFlow-orange" },
+    { "alt": "PyTorch", "src": "https://img.shields.io/badge/PyTorch-magenta" },
+    { "alt": "Flask", "src": "https://img.shields.io/badge/Flask-darkblue" },
+    { "alt": "MongoDB", "src": "https://img.shields.io/badge/MongoDB-green" },
+    { "alt": "MySQL", "src": "https://img.shields.io/badge/MySQL-blue" },
+    { "alt": "PostgreSQL", "src": "https://img.shields.io/badge/PostgreSQL-lightblue" }
+  ],
+  "aboutIntroTemplate": "I'm a {age} year old software engineer.",
+  "aboutParagraphs": [
+    { "id": "stay-updated", "text": "I thrive on staying updated with the latest models and development kits across all platforms. While my heart lies in artificial intelligence and its API services, I also excel in single board computers, GPU & TPU optimizing, and embedding systems development on ESP, STM or NRF." },
+    { "id": "tech-monolith", "text": "In 2023, I co-founded Tech Monolith with my coworkers. Since then, we developed LLM and IoT systems that impact health." },
+    { "id": "collaboration", "text": "Having collaborated with diverse companies worldwide, from e-commerce to heavy manufacturing industries, I've honed the ability to manage multiple projects simultaneously across various time zones." },
+    { "id": "spare-time", "text": "In my spare time, I indulge in scrolling through airsoft listings or admiring my collection, although long-time mil-sim events have taken a backseat due to my various work commitments." }
+  ],
+  "employment": [
+    {
+      "company": "Tech Monolith",
+      "period": "December 2023 - Present",
+      "role": "Co-Founder, CTO",
+      "description": "I have experience in developing advanced image processing solutions for both entertainment and industrial projects. My expertise extends to implementing natural language processing (NLP) applications across various use cases in these fields. I specialize in deploying AI models using PyTorch and TensorFlow, as well as building optimized AI inference APIs with ONNX. Additionally, I have a strong background in high-performance computing optimizations on embedded systems and single-board computers, leveraging CUDA and edge-based development techniques. My skills also include automating AI projects through Linux shell scripting on single-board computers.\n\nIn terms of leadership, I have successfully led and managed software development teams and project workflows, ensuring smooth execution from start to finish. I am experienced in working with and fine-tuning large language models such as MedLLama2, GPT, and models hosted on Hugging Face. Moreover, I am proficient in deploying and managing AI models using the Ollama platform and implementing cloud-based solutions by deploying and scaling AI models on Google Cloud Platform (GCP).\n\nFurthermore, I have experience in embedded systems development, creating low-power, wireless communication solutions for IoT and healthcare devices using microcontrollers such as ESP32/ESP8266, STM32, and nRF52/nRF53."
+    },
+    {
+      "company": "Farmakod",
+      "period": "April 2023 - December 2023",
+      "role": "R&D Team, Team Lead & Sr. Software Engineer",
+      "description": "I have experience in leading software projects and end-to-end industrial project planning. I have worked on image processing for non-destructive inspection and industrial robotics. My expertise includes deploying AI models as APIs using FastAPI and deploying AI models with PyTorch for X-ray imaging. I have also worked on optimizing AI models for Edge TPU single-board computers and CUDA-supported GPUs. Additionally, I have experience in writing shell scripts on Linux for AI projects running on single-board computers."
+    },
+    {
+      "company": "Massive Bio",
+      "period": "July 2019 - February 2023",
+      "role": "AI Development Team, Developer",
+      "description": "I have experience in natural language processing (NLP) for the English language using Python, covering tasks such as text classification, named entity recognition, sentiment analysis, aspect-level sentiment analysis, relation extraction, and semantic role labeling. I am proficient in deep learning algorithms, including RNN, LSTM, and GRU, and have worked with various document and word embedding techniques such as BERT, ELMO, GLOVE, and WORD2VEC. My expertise also includes applying machine learning techniques like linear regression, logistic regression, and SVM using Keras, as well as K-means clustering for unsupervised learning tasks. Additionally, I have experience in developing RESTful APIs with Flask and performing text processing tasks using regular expressions (REGEX)."
+    }
+  ],
+  "resumeLinkLabel": "Check out my résumé here.",
+  "resumeLocalPath": "/files/mburakbilgic_en.pdf"
+}

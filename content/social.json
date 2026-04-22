@@ -1,0 +1,23 @@
+[
+  {
+    "platform": "linkedin",
+    "label": "LinkedIn",
+    "url": "https://www.linkedin.com/in/muhammetburak/",
+    "icon": "Linkedin.webp",
+    "accessKey": "L"
+  },
+  {
+    "platform": "x",
+    "label": "Twitter",
+    "url": "https://x.com/MBurakBilgic",
+    "icon": "Twitter.webp",
+    "accessKey": "T"
+  },
+  {
+    "platform": "github",
+    "label": "GitHub",
+    "url": "https://github.com/mburakbilgic",
+    "icon": "Github.webp",
+    "accessKey": "G"
+  }
+]
