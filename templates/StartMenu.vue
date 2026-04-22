@@ -1,57 +1,49 @@
+<script setup>
+import { useContent } from '@/composables/useContent'
+
+const { social } = useContent()
+const resumeUrl = useRuntimeConfig().public.resumePdfUrl
+
+const socialIcons = import.meta.glob('@/assets/iPhone-Icons/*.webp', { eager: true })
+
+/**
+ * Resolves a social media icon filename to the public URL produced
+ * by Vite's bundler.
+ *
+ * @param {string} iconFile
+ * @returns {string}
+ */
+const resolveSocialIcon = (iconFile) => {
+  const match = Object.entries(socialIcons).find(([path]) => path.endsWith('/' + iconFile))
+  return match ? match[1].default : ''
+}
+</script>
+
 <template>
-<div class="menu" style="z-index: 1000000">
+  <div class="menu" style="z-index: 1000000">
     <div class="sidebar">
-        <img class="sidebar-image" src="@/assets/sidebar-image.png" />
+      <img class="sidebar-image" src="@/assets/sidebar-image.png" />
     </div>
     <div class="socials">
-        <a href="https://www.instagram.com/lizardonthecamera/" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Instagram.webp" />
-                <div class="social-text"><u>I</u>nstagram</div>
-            </div>
+      <template v-for="link in social" :key="link.platform">
+        <a :href="link.url" target="_blank">
+          <div class="bar">
+            <img class="social-image" :src="resolveSocialIcon(link.icon)" />
+            <u>{{ link.accessKey }}</u>{{ link.label.slice(1) }}
+          </div>
         </a>
-        <a href="https://www.reddit.com/user/satoshigekkouga2303" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Reddit.webp" />
-                <u>R</u>eddit
-            </div>
-        </a>
-        <a href="https://www.linkedin.com/in/don-chia" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Linkedin.webp" />
-                <u>L</u>inkedIn
-            </div>
-        </a>
-        <a href="https://twitter.com/lizarDON2303" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Twitter.webp" />
-                <u>T</u>witter
-            </div>
-        </a>
-        <a href="https://github.com/DonChiaQE" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Github.webp" />
-                <u>G</u>itHub
-            </div>
-        </a>
-        <div class="divider"></div>
-        <a href="/files/don_chia_resume.pdf" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/win95Icons/resume.png" />
-                <u>R</u>ésumé
-            </div>
-        </a>
-        <a href="https://apps.apple.com/app/nossaflex/id1523558285" target="_blank">
-            <div class="bar">
-                <img class="social-image" src="@/assets/iPhone-Icons/Nossaflex.webp" />
-                <u>N</u>OSSAFLEX
-            </div>
-        </a>
+      </template>
+      <div class="divider"></div>
+      <a v-if="resumeUrl" :href="resumeUrl" target="_blank">
+        <div class="bar">
+          <img class="social-image" src="@/assets/win95Icons/resume.png" />
+          <u>R</u>ésumé
+        </div>
+      </a>
     </div>
-</div>
+  </div>
 </template>
 
-  
 <style scoped>
 .menu {
     width: 165px;

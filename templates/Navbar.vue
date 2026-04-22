@@ -1,27 +1,15 @@
 <script setup>
 import moment from "moment";
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
 } from '@/stores/windows'
+import { useImagePath } from '@/composables/useImagePath'
 
-const date = ref("")
 const time = ref("")
 
 const windowsStore = useWindowsStore()
-
-const getImagePath = (iconImage) => {
-    const path = `../assets/win95Icons/${iconImage}`;
-    const modules =
-        import.meta.glob("../assets/win95Icons/*", {
-            eager: true
-        });
-    const mod = modules[path]
-    if (mod == undefined) {
-        return ""
-    } else {
-        return mod.default;
-    }
-};
+const { iconPath } = useImagePath()
 
 const openWindow = (windowId) => {
     const payload = {
@@ -31,13 +19,18 @@ const openWindow = (windowId) => {
     windowsStore.setWindowState(payload)
 }
 
-onBeforeMount(() => {
-    setInterval(() => {
-        time.value = moment().format("hh:mm A");
-    }, 1000);
-    setInterval(() => {
-        date.value = moment().format("ddd DD MMMM");
-    }, 1000);
+let clockInterval = null
+
+onMounted(() => {
+    const tick = () => {
+        time.value = moment().format("hh:mm A")
+    }
+    tick()
+    clockInterval = setInterval(tick, 1000)
+})
+
+onBeforeUnmount(() => {
+    if (clockInterval) clearInterval(clockInterval)
 })
 </script>
 
@@ -53,30 +46,30 @@ onBeforeMount(() => {
                 ? 'border-box'
                 : 'container-border'
             ">
-            <img class="start-icon" src="../assets/win95.png" />
+            <img class="start-icon" src="@/assets/win95.png" />
             <button style="padding-left: 3px; font-size: 0.9rem; font-weight: bold">
                 Start
             </button>
         </div>
     </div>
     <div class="overflow-x-scroll flex no-scrollbar">
-    <div v-for="window in windowsStore.activeWindows" :key="window.key">
+    <div v-for="window in windowsStore.activeWindows" :key="window.windowId">
         <button v-if="
             windowsStore.activeWindow !== window.windowId &&
             (window.windowState == 'open' || window.windowState == 'minimize')
             " @click="openWindow(window.windowId)" class="navbar-item open">
-            <img class="icon-image" :src=getImagePath(window.iconImage) :alt="window.altText" />
+            <img class="icon-image" :src="iconPath(window.iconImage)" :alt="window.altText" />
             <p>{{ window.displayName }}</p>
         </button>
         <button v-if="windowsStore.activeWindow == window.windowId" @click="openWindow(window.windowId)" class="navbar-item-depressed">
-            <img class="icon-image" :src=getImagePath(window.iconImage) :alt="window.altText" />
+            <img class="icon-image" :src="iconPath(window.iconImage)" :alt="window.altText" />
             <p>{{ window.displayName }}</p>
         </button>
     </div>
     </div>
     <div class="spacer"></div>
     <div alt="time" class="time">
-        <img src="../assets/speakers.png" class="icon-image" />
+        <img src="@/assets/speakers.png" class="icon-image" />
         <time>
             {{ time }}
         </time>
@@ -181,7 +174,6 @@ onBeforeMount(() => {
     border-right: solid rgb(90, 90, 90) 1.5px;
     background: rgb(192, 192, 192);
     display: flex !important;
-    /* justify-content: space-between; */
     justify-content: center;
     align-items: center;
 }
