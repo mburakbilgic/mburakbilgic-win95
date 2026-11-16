@@ -64,6 +64,21 @@
     "serial": "Volume serial number is {serial}",
     "noSubfolders": "No subfolders exist"
   },
+  "editor": {
+    "menuFile": "File",
+    "save": "Save",
+    "saveShortcut": "Ctrl+S",
+    "exit": "Exit",
+    "exitShortcut": "Esc",
+    "hint": "Ctrl+S=Save  Esc=Exit  Alt+F=File menu",
+    "position": "Line:{line}  Col:{col}",
+    "saved": "File saved.",
+    "readOnlyTag": "[Read-Only]",
+    "savePrompt": "Loaded file is not saved. Save it now?",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel"
+  },
   "help": [
     {
       "command": "ATTRIB",
@@ -79,7 +94,7 @@
     },
     {
       "command": "COPY",
-      "text": "Copies files. COPY A:\\*.* [destination] uploads from your computer."
+      "text": "Copies files. COPY A:\\*.* [dest] uploads; COPY CON file types a new file (Ctrl+Z, Enter ends)."
     },
     {
       "command": "DEL",
@@ -92,6 +107,10 @@
     {
       "command": "ECHO",
       "text": "Displays a message. ECHO text > file writes it, >> appends it."
+    },
+    {
+      "command": "EDIT",
+      "text": "Opens a text file in the editor (creates it on save). Ctrl+S saves, Esc exits."
     },
     {
       "command": "EXIT",

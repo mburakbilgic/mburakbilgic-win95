@@ -23,3 +23,8 @@ export const DOS_PROMPT_WINDOW_ID = 'DosPromptWindow'
  * How many commands the MS-DOS Prompt remembers for ↑/↓ recall.
  */
 export const DOS_HISTORY_MAX = 50
+
+/**
+ * End-of-file marker (Ctrl+Z / F6) that ends COPY CON input; shown as ^Z.
+ */
+export const DOS_EOF_CHAR = '\u001a'

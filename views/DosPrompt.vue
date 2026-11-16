@@ -1,10 +1,11 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DosFrame from '@/templates/DosFrame.vue'
+import DosEditor from '@/templates/DosEditor.vue'
 import dos from '@/content/dos.json'
 import { useDosShell } from '@/composables/useDosShell'
 import { useWindowsStore } from '@/stores/windows'
-import { DOS_PROMPT_WINDOW_ID } from '@/constants/ui'
+import { DOS_EOF_CHAR, DOS_PROMPT_WINDOW_ID } from '@/constants/ui'
 
 const windowsStore = useWindowsStore()
 const screenRef = ref(null)
@@ -38,7 +39,8 @@ const shell = useDosShell({
   onExit: () => windowsStore.setWindowState({ windowState: 'close', windowId: DOS_PROMPT_WINDOW_ID }),
   pickFiles,
 })
-const { lines, prompt, mode } = shell
+const { lines, prompt, mode, editor } = shell
+const displayInput = computed(() => input.value.split(DOS_EOF_CHAR).join('^Z'))
 
 let expiryTimer = null
 
@@ -69,6 +71,17 @@ const onKeydown = async (event) => {
     focusInput()
     return
   }
+  const ctrlKey = event.ctrlKey ? event.key.toLowerCase() : ''
+  if (mode.value === 'input' && (ctrlKey === 'z' || event.key === 'F6')) {
+    event.preventDefault()
+    input.value += DOS_EOF_CHAR
+    return
+  }
+  if (ctrlKey === 'c' && shell.interrupt()) {
+    event.preventDefault()
+    input.value = ''
+    return
+  }
   if (event.key === 'Escape') {
     input.value = ''
     return
@@ -78,6 +91,13 @@ const onKeydown = async (event) => {
     const recalled = shell.recall(event.key === 'ArrowUp' ? -1 : 1)
     if (recalled !== null) input.value = recalled
   }
+}
+
+const onEditorClose = async () => {
+  shell.closeEditor()
+  await nextTick()
+  scrollToBottom()
+  focusInput()
 }
 
 watch(() => lines.value.length, () => nextTick(scrollToBottom))
@@ -96,11 +116,20 @@ onBeforeUnmount(() => {
 
 <template>
   <DosFrame>
-    <div ref="screenRef" class="dos-screen" @click="focusInput">
+    <DosEditor
+      v-if="mode === 'edit' && editor"
+      :key="editor.path"
+      :name="editor.name"
+      :content="editor.content"
+      :readonly="editor.readonly"
+      :save="shell.saveEditor"
+      @close="onEditorClose"
+    />
+    <div v-else ref="screenRef" class="dos-screen" @click="focusInput">
       <div v-for="line in lines" :key="line.id" class="dos-line" :class="line.cls">{{ line.text || ' ' }}</div>
       <div class="dos-line dos-input-line">
         <template v-if="mode !== 'busy'">
-          <span>{{ mode === 'password' ? dos.messages.passwordPrompt : prompt }}</span><span>{{ mode === 'password' ? '*'.repeat(input.length) : input }}</span><span class="dos-cursor"></span>
+          <span>{{ mode === 'password' ? dos.messages.passwordPrompt : prompt }}</span><span>{{ mode === 'password' ? '*'.repeat(input.length) : displayInput }}</span><span class="dos-cursor"></span>
         </template>
         <input
           ref="inputRef"

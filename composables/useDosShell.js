@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import dos from '@/content/dos.json'
-import { DOS_HISTORY_MAX } from '@/constants/ui'
+import { DOS_EOF_CHAR, DOS_HISTORY_MAX } from '@/constants/ui'
 import {
   fillTemplate,
   formatAttribLine,
@@ -46,13 +46,17 @@ const formatClock = (epochMs) => {
  * @returns {{
  *   lines: import('vue').Ref<Array<{ id: number, text: string, cls: string }>>,
  *   prompt: import('vue').ComputedRef<string>,
- *   mode: import('vue').Ref<'command'|'password'|'confirm'|'busy'>,
+ *   mode: import('vue').Ref<'command'|'password'|'confirm'|'input'|'edit'|'busy'>,
  *   admin: import('vue').Ref<boolean>,
  *   expiresAt: import('vue').Ref<number|null>,
+ *   editor: import('vue').Ref<{ path: string, name: string, content: string, readonly: boolean }|null>,
  *   init: () => Promise<void>,
  *   submit: (input: string) => Promise<void>,
  *   recall: (direction: -1|1) => string|null,
  *   expireSession: () => void,
+ *   interrupt: () => boolean,
+ *   saveEditor: (content: string) => Promise<{ ok: boolean, message: string }>,
+ *   closeEditor: () => void,
  * }}
  * @example
  *   const shell = useDosShell({ onExit: closeWindow })
@@ -70,10 +74,15 @@ export const useDosShell = ({ onExit, pickFiles }) => {
   let nextLineId = 1
   const question = ref('')
   let answerQuestion = null
+  const editor = ref(null)
+  let editSession = null
+  let copyCon = null
 
-  const prompt = computed(() =>
-    mode.value === 'confirm' ? question.value : `${admin.value ? dos.adminPromptPrefix : ''}${cwd.value}>`,
-  )
+  const prompt = computed(() => {
+    if (mode.value === 'confirm') return question.value
+    if (mode.value === 'input') return ''
+    return `${admin.value ? dos.adminPromptPrefix : ''}${cwd.value}>`
+  })
 
   const print = (text = '', cls = '') => {
     String(text)
@@ -143,17 +152,22 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     print(message('sessionExpired'), 'warn')
   }
 
+  const fsErrorText = (code, name) => {
+    if (code === 'NOT_FOUND') return message('fileNotFound', { name })
+    if (code === 'NOT_A_DIR') return message('invalidDirectory')
+    if (['IS_A_DIR', 'READ_ONLY', 'PROTECTED'].includes(code)) return message('accessDenied')
+    if (code === 'INVALID_PATH' || code === 'INVALID_NAME') return message('invalidPath')
+    if (code === 'TOO_LARGE') return message('fileTooLarge', { name })
+    if (code === 'UNSUPPORTED_TYPE') return message('unsupportedType', { name })
+    if (code === 'INVALID_MOVE') return message('copyOntoItself')
+    if (code === 'UNAUTHORIZED') return message('adminRequired')
+    return message('generalFailure')
+  }
+
   const reportFsError = (error, name) => {
     const code = errorCode(error)
-    if (code === 'NOT_FOUND') printError(message('fileNotFound', { name }))
-    else if (code === 'NOT_A_DIR') printError(message('invalidDirectory'))
-    else if (['IS_A_DIR', 'READ_ONLY', 'PROTECTED'].includes(code)) printError(message('accessDenied'))
-    else if (code === 'INVALID_PATH' || code === 'INVALID_NAME') printError(message('invalidPath'))
-    else if (code === 'TOO_LARGE') printError(message('fileTooLarge', { name }))
-    else if (code === 'UNSUPPORTED_TYPE') printError(message('unsupportedType', { name }))
-    else if (code === 'INVALID_MOVE') printError(message('copyOntoItself'))
-    else if (code === 'UNAUTHORIZED') expireSession()
-    else printError(message('generalFailure'))
+    if (code === 'UNAUTHORIZED') expireSession()
+    else printError(fsErrorText(code, name))
   }
 
   const post = async (url, body) => {
@@ -276,6 +290,33 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     if (result.data?.siteChanged) print(message('refreshHint'), 'dim')
   }
 
+  const startCopyCon = (destination, overwriteAll) => {
+    if (!destination) {
+      printError(message('requiredParameter'))
+      return
+    }
+    const path = resolveArg(destination)
+    if (!path) return
+    copyCon = { path, name: destination, overwriteAll, typed: [] }
+    mode.value = 'input'
+  }
+
+  const finishCopyCon = async (tail) => {
+    const { path, name, overwriteAll, typed } = copyCon
+    copyCon = null
+    const content = `${typed.map((line) => `${line}\n`).join('')}${tail}`
+    const result = await withOverwritePrompt(
+      name,
+      (overwrite) => post('/api/fs/write', { path, content, mode: overwrite ? 'overwrite' : 'create' }),
+      { all: overwriteAll },
+    )
+    if (result.error) reportFsError(result.error, name)
+    else if (!result.skipped) printWarnings(result.data)
+    const copied = !result.error && !result.skipped
+    print(`${SUMMARY_INDENT}${message('filesCopied', { count: copied ? 1 : 0 })}`)
+    if (copied && result.data?.siteChanged) print(message('refreshHint'), 'dim')
+  }
+
   const commands = {
     async ATTRIB({ args, switches }) {
       if (!assertSwitches(switches, [])) return
@@ -335,6 +376,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
       if (!requireAdminSession()) return
       const overwriteAll = switches.includes('Y')
+      if (/^con$/i.test(args[0])) return startCopyCon(args[1], overwriteAll)
       // Must stay synchronous up to pickFiles(): the browser only opens the
       // file picker inside the keydown that submitted the command.
       if (/^a:/i.test(args[0])) return copyFromFloppy(args[0], args[1], overwriteAll)
@@ -387,6 +429,34 @@ export const useDosShell = ({ onExit, pickFiles }) => {
         target,
         { NOT_FOUND: 'invalidPath' },
       )
+    },
+
+    async EDIT({ args, switches }) {
+      if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
+      const path = resolveArg(args[0])
+      if (!path) return
+      let file = null
+      try {
+        file = await $fetch('/api/fs/read', { query: { path } })
+      } catch (error) {
+        if (errorCode(error) !== 'NOT_FOUND') {
+          reportFsError(error, args[0])
+          return
+        }
+      }
+      if (file?.binary) {
+        printError(message('binaryFile', { name: file.name, size: file.size.toLocaleString('en-US') }))
+        return
+      }
+      const canonical = file?.path || path
+      editSession = { saved: false, siteChanged: false, warnings: [] }
+      editor.value = {
+        path: canonical,
+        name: canonical.split('\\').pop(),
+        content: file?.content || '',
+        readonly: Boolean(file?.readonly),
+      }
+      mode.value = 'edit'
     },
 
     EXIT() {
@@ -542,6 +612,20 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       return
     }
 
+    if (mode.value === 'input') {
+      print(input.split(DOS_EOF_CHAR).join('^Z'))
+      const eof = input.indexOf(DOS_EOF_CHAR)
+      if (eof === -1) {
+        copyCon.typed.push(input)
+        return
+      }
+      mode.value = 'busy'
+      await finishCopyCon(input.slice(0, eof))
+      if (mode.value === 'busy') mode.value = 'command'
+      print('')
+      return
+    }
+
     if (mode.value === 'password') {
       print(`${dos.messages.passwordPrompt}${'*'.repeat(input.length)}`)
       mode.value = 'busy'
@@ -574,7 +658,63 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     } finally {
       if (mode.value === 'busy') mode.value = 'command'
     }
-    if (parsed.command !== 'CLS' && mode.value !== 'password') print('')
+    if (parsed.command !== 'CLS' && mode.value === 'command') print('')
+  }
+
+  /**
+   * Ctrl+C: abandons COPY CON input without writing anything.
+   *
+   * @returns {boolean} Whether there was input to interrupt.
+   */
+  const interrupt = () => {
+    if (mode.value !== 'input') return false
+    copyCon = null
+    print('^C')
+    print('')
+    mode.value = 'command'
+    return true
+  }
+
+  /**
+   * Saves the EDIT buffer to the open file.
+   *
+   * @param {string} content
+   * @returns {Promise<{ ok: boolean, message: string }>} `message` is a
+   *   content warning or error text for the editor status bar, or '' on a clean save.
+   * @throws {Error} When no file is open in the editor.
+   * @example
+   *   const { ok, message } = await shell.saveEditor(text)
+   */
+  const saveEditor = async (content) => {
+    if (!editor.value || !editSession) throw new Error('saveEditor called without an open editor')
+    const result = await post('/api/fs/write', { path: editor.value.path, content, mode: 'overwrite' })
+    if (result.error) {
+      if (result.code === 'UNAUTHORIZED') expireSession()
+      return { ok: false, message: fsErrorText(result.code, editor.value.name) }
+    }
+    editSession.saved = true
+    editSession.siteChanged ||= Boolean(result.data?.siteChanged)
+    editSession.warnings = result.data?.warnings || []
+    const [warning] = editSession.warnings
+    return { ok: true, message: warning ? message('contentWarning', { text: warning }) : '' }
+  }
+
+  /**
+   * Leaves EDIT and returns to the prompt, reporting what the saves did.
+   *
+   * @returns {void}
+   */
+  const closeEditor = () => {
+    if (!editor.value) return
+    const session = editSession
+    editor.value = null
+    editSession = null
+    if (session?.saved) {
+      session.warnings.forEach((text) => print(message('contentWarning', { text }), 'warn'))
+      if (session.siteChanged) print(message('refreshHint'), 'dim')
+    }
+    print('')
+    mode.value = 'command'
   }
 
   /**
@@ -603,5 +743,19 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     }
   }
 
-  return { lines, prompt, mode, admin, expiresAt, init, submit, recall, expireSession }
+  return {
+    lines,
+    prompt,
+    mode,
+    admin,
+    expiresAt,
+    editor,
+    init,
+    submit,
+    recall,
+    expireSession,
+    interrupt,
+    saveEditor,
+    closeEditor,
+  }
 }
