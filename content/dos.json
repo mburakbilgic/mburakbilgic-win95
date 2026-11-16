@@ -48,7 +48,14 @@
     "duplicateFileName": "Duplicate file name or file not found",
     "invalidParameter": "Invalid parameter - {param}",
     "syntaxError": "Syntax error",
-    "echoOn": "ECHO is on"
+    "echoOn": "ECHO is on",
+    "deleteAllPrompt": "All files in directory will be deleted!\nAre you sure (Y/N)?",
+    "deltreeDirPrompt": "Delete directory \"{name}\" and all its subdirectories? [yn] ",
+    "deltreeFilePrompt": "Delete file \"{name}\"? [yn] ",
+    "deleting": "Deleting {name}...",
+    "moveOk": "{from} => {to} [ok]",
+    "copyMultipleToFile": "Cannot copy multiple files to a single file",
+    "moveMultipleToFile": "Cannot move multiple files to a single file"
   },
   "dir": {
     "volume": " Volume in drive C is {label}",
@@ -98,7 +105,11 @@
     },
     {
       "command": "DEL",
-      "text": "Deletes a file (ERASE)."
+      "text": "Deletes files. Wildcards allowed: DEL *.TXT (ERASE)."
+    },
+    {
+      "command": "DELTREE",
+      "text": "Deletes a directory and everything in it. DELTREE [/Y] path"
     },
     {
       "command": "DIR",
@@ -131,6 +142,10 @@
     {
       "command": "MD",
       "text": "Creates a directory (MKDIR)."
+    },
+    {
+      "command": "MOVE",
+      "text": "Moves files or renames directories. MOVE [/Y] source destination"
     },
     {
       "command": "RD",

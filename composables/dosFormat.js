@@ -85,6 +85,71 @@ export const formatAttribLine = (entry, path) =>
   `      ${entry.hidden ? 'H' : ' '}${entry.readonly ? 'R' : ' '}     ${path}`
 
 /**
+ * Whether a DOS argument contains `*` or `?`.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ * @example
+ *   hasWildcard('*.TXT') // → true
+ */
+export const hasWildcard = (text) => /[*?]/.test(text)
+
+const wildcardRegExp = (pattern) =>
+  new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i')
+
+/**
+ * Matches a long file name against a DOS wildcard, case-insensitively.
+ * `*.*` matches every name, `NAME.*` also matches `NAME` without an
+ * extension and `*.` matches only names without one, as in Windows 95.
+ *
+ * @param {string} name
+ * @param {string} pattern
+ * @returns {boolean}
+ * @example
+ *   matchesWildcard('Phase1.txt', 'PHASE?.TXT') // → true
+ */
+export const matchesWildcard = (name, pattern) => {
+  if (pattern === '*' || pattern === '*.*') return true
+  if (pattern.endsWith('.*')) return wildcardRegExp(pattern).test(name) || wildcardRegExp(pattern.slice(0, -2)).test(name)
+  if (pattern.endsWith('.')) return !name.includes('.') && wildcardRegExp(pattern.slice(0, -1)).test(name)
+  return wildcardRegExp(pattern).test(name)
+}
+
+const splitExtension = (name) => {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? [name.slice(0, dot), name.slice(dot + 1)] : [name, '']
+}
+
+const applyPatternPart = (source, pattern) => {
+  let out = ''
+  for (let i = 0; i < pattern.length; i++) {
+    if (pattern[i] === '*') return `${out}${source.slice(i)}`
+    out += pattern[i] === '?' ? source[i] || '' : pattern[i]
+  }
+  return out
+}
+
+/**
+ * Builds the target name of a wildcard REN the way DOS does: `?` keeps
+ * the source character at that position and `*` keeps the rest of the
+ * source name (or extension).
+ *
+ * @param {string} name Source file name.
+ * @param {string} pattern Target pattern, e.g. `*.BAK`.
+ * @returns {string}
+ * @example
+ *   applyRenamePattern('NOTES.TXT', '*.BAK') // → 'NOTES.BAK'
+ */
+export const applyRenamePattern = (name, pattern) => {
+  if (!pattern.includes('.')) return applyPatternPart(name, pattern)
+  const [base, ext] = splitExtension(name)
+  const [patternBase, patternExt] = splitExtension(pattern)
+  const newBase = applyPatternPart(base, patternBase)
+  const newExt = applyPatternPart(ext, patternExt)
+  return newExt ? `${newBase}.${newExt}` : newBase
+}
+
+/**
  * Joins a canonical directory path and an entry name.
  *
  * @param {string} dir e.g. `C:\` or `C:\MBURAKBILGIC`
@@ -187,15 +252,15 @@ const formatBytes = (n) => n.toLocaleString('en-US')
  * 8.3 short name, size or `<DIR>`, date, time and the long name.
  *
  * @param {{ path: string, updatedAt: string, entries: Array<{ name: string, type: 'dir'|'file', size: number, updatedAt: string, hidden: boolean }> }} listing
- * @param {{ showHidden: boolean, labels: object, volumeLabel: string, volumeSerial: string }} options
+ * @param {{ showHidden: boolean, hideDots?: boolean, labels: object, volumeLabel: string, volumeSerial: string }} options
  * @returns {string[]}
  * @example
  *   formatDirListing(await $fetch('/api/fs/list?path=C:\\'), { showHidden: false, labels: dos.dir, ... })
  */
-export const formatDirListing = (listing, { showHidden, labels, volumeLabel, volumeSerial }) => {
+export const formatDirListing = (listing, { showHidden, hideDots = false, labels, volumeLabel, volumeSerial }) => {
   const entries = listing.entries.filter((e) => showHidden || !e.hidden)
   const taken = new Set()
-  const isDriveRoot = listing.path === `${DRIVE_C}\\`
+  const showDots = listing.path !== `${DRIVE_C}\\` && !hideDots
   const row = (short, isDir, size, iso, longName) => {
     const { date, time } = formatDate(iso)
     const sizeField = isDir
@@ -210,12 +275,12 @@ export const formatDirListing = (listing, { showHidden, labels, volumeLabel, vol
     fillTemplate(labels.directoryOf, { path: listing.path }),
     '',
   ]
-  if (!isDriveRoot) {
+  if (showDots) {
     lines.push(row({ base: '.', ext: '' }, true, 0, listing.updatedAt, '.'))
     lines.push(row({ base: '..', ext: '' }, true, 0, listing.updatedAt, '..'))
   }
   let fileCount = 0
-  let dirCount = isDriveRoot ? 0 : 2
+  let dirCount = showDots ? 2 : 0
   let totalBytes = 0
   entries.forEach((entry) => {
     const isDir = entry.type === 'dir'

@@ -2,12 +2,15 @@ import { computed, ref } from 'vue'
 import dos from '@/content/dos.json'
 import { DOS_EOF_CHAR, DOS_HISTORY_MAX } from '@/constants/ui'
 import {
+  applyRenamePattern,
   fillTemplate,
   formatAttribLine,
   formatDirListing,
   formatTree,
+  hasWildcard,
   isSameOrInside,
   joinDosPath,
+  matchesWildcard,
   parseCommandLine,
   resolveDosPath,
   splitRedirect,
@@ -16,9 +19,10 @@ import {
 const PAYLOAD_TOO_LARGE = 413
 const SUMMARY_INDENT = '        '
 const CONFIRM_ANSWERS = ['Y', 'N', 'A']
+const YES_NO_ANSWERS = ['Y', 'N']
 const ECHO_DELIMITER = /[\s.,:;=+/([\]]/
 const ATTRIB_FLAG = /^([+-])([RH])$/i
-const RENAME_INVALID_NAME = /[\\/:*?]/
+const RENAME_INVALID_NAME = /[\\/:]/
 const DRIVE_ROOT_LENGTH = 3
 
 const parentDosPath = (path) => {
@@ -74,6 +78,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
   let nextLineId = 1
   const question = ref('')
   let answerQuestion = null
+  let allowedAnswers = CONFIRM_ANSWERS
   const editor = ref(null)
   let editSession = null
   let copyCon = null
@@ -122,9 +127,10 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     return true
   }
 
-  const ask = (text) =>
+  const ask = (text, answers = CONFIRM_ANSWERS) =>
     new Promise((resolve) => {
       question.value = text
+      allowedAnswers = answers
       answerQuestion = resolve
       mode.value = 'confirm'
     })
@@ -160,6 +166,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     if (code === 'TOO_LARGE') return message('fileTooLarge', { name })
     if (code === 'UNSUPPORTED_TYPE') return message('unsupportedType', { name })
     if (code === 'INVALID_MOVE') return message('copyOntoItself')
+    if (code === 'EXISTS') return message('duplicateFileName')
     if (code === 'UNAUTHORIZED') return message('adminRequired')
     return message('generalFailure')
   }
@@ -189,8 +196,17 @@ export const useDosShell = ({ onExit, pickFiles }) => {
    * @param {Record<string, string>} [errorMessages] Error code → dos.json message key overrides.
    * @returns {Promise<object|null>} Response data, or null on error.
    */
-  const runWrite = async (url, body, name, errorMessages = {}) => {
-    const result = await post(url, body)
+  const runWrite = async (url, body, name, errorMessages = {}) => reportWrite(await post(url, body), name, errorMessages)
+
+  /**
+   * Prints the outcome of a finished write request (see runWrite).
+   *
+   * @param {{ data?: object, error?: unknown, code?: string }} result
+   * @param {string} name
+   * @param {Record<string, string>} [errorMessages]
+   * @returns {object|null}
+   */
+  const reportWrite = (result, name, errorMessages = {}) => {
     if (result.error) {
       const key = errorMessages[result.code]
       if (key) printError(message(key, { name }))
@@ -206,9 +222,11 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     const target = path ? parentDosPath(path) : { parent: cwd.value, name: '' }
     try {
       const listing = await $fetch('/api/fs/list', { query: { path: target.parent } })
-      const entries = target.name
-        ? listing.entries.filter((e) => e.name.toUpperCase() === target.name.toUpperCase())
-        : listing.entries.filter((e) => e.type === 'file')
+      const entries = listing.entries.filter((e) =>
+        target.name && !hasWildcard(target.name)
+          ? e.name.toUpperCase() === target.name.toUpperCase()
+          : e.type === 'file' && matchesWildcard(e.name, target.name || '*'),
+      )
       if (!entries.length) {
         printError(message('fileNotFound', { name: typed || '*.*' }))
         return
@@ -217,6 +235,72 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     } catch (error) {
       reportFsError(error, typed)
     }
+  }
+
+  const printRefreshHint = (siteChanged) => {
+    if (siteChanged) print(message('refreshHint'), 'dim')
+  }
+
+  /**
+   * Lists the files in a directory that match the wildcard in the last
+   * segment of `path` (hidden files only when asked, as DOS DEL/COPY skip
+   * them). Prints "File not found" when nothing matches.
+   *
+   * @param {string} path Resolved path whose last segment is the pattern.
+   * @param {string} typed Argument as typed, for messages.
+   * @param {{ includeHidden?: boolean }} [options]
+   * @returns {Promise<Array<{ name: string, path: string, hidden: boolean, readonly: boolean }>>}
+   */
+  const expandFiles = async (path, typed, { includeHidden = false } = {}) => {
+    const { parent, name } = parentDosPath(path)
+    try {
+      const listing = await $fetch('/api/fs/list', { query: { path: parent } })
+      const files = listing.entries
+        .filter((e) => e.type === 'file' && (includeHidden || !e.hidden) && matchesWildcard(e.name, name))
+        .map((e) => ({ ...e, path: joinDosPath(listing.path, e.name) }))
+      if (!files.length) printError(message('fileNotFound', { name: typed }))
+      return files
+    } catch (error) {
+      reportFsError(error, typed)
+      return []
+    }
+  }
+
+  const entryType = async (path) => {
+    try {
+      await $fetch('/api/fs/list', { query: { path } })
+      return 'dir'
+    } catch (error) {
+      return errorCode(error) === 'NOT_A_DIR' ? 'file' : null
+    }
+  }
+
+  /**
+   * Runs one write request per file and reports errors per file; stops
+   * when the session has expired.
+   *
+   * @param {Array<{ name: string }>} files
+   * @param {(file: object) => Promise<{ data?: object, error?: unknown, code?: string, skipped?: boolean }>} request
+   * @param {(file: object, data: object) => void} [onSuccess]
+   * @returns {Promise<{ done: number, siteChanged: boolean }>}
+   */
+  const runBatch = async (files, request, onSuccess) => {
+    let done = 0
+    let siteChanged = false
+    for (const file of files) {
+      const result = await request(file)
+      if (result.skipped) continue
+      if (result.error) {
+        reportFsError(result.error, file.name)
+        if (result.code === 'UNAUTHORIZED') break
+        continue
+      }
+      done++
+      siteChanged ||= Boolean(result.data?.siteChanged)
+      printWarnings(result.data)
+      if (onSuccess) onSuccess(file, result.data)
+    }
+    return { done, siteChanged }
   }
 
   const uploadFile = (file, path, overwrite) => {
@@ -271,11 +355,57 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     if (siteChanged) print(message('refreshHint'), 'dim')
   }
 
+  /**
+   * COPY or MOVE every file matching a wildcard into a directory, asking
+   * before each overwrite (Yes/No/All). Prints each source name like DOS.
+   *
+   * @param {'copy'|'move'} action
+   * @param {string} from Resolved source path with a wildcard in its last segment.
+   * @param {string} typed Source argument as typed.
+   * @param {string} to Resolved destination.
+   * @param {boolean} overwriteAll /Y switch.
+   * @returns {Promise<{ done: number, siteChanged: boolean }>}
+   */
+  const copyOrMoveMatches = async (action, from, typed, to, overwriteAll) => {
+    const files = await expandFiles(from, typed)
+    if (!files.length) return { done: 0, siteChanged: false }
+    if (files.length > 1 && (await entryType(to)) !== 'dir') {
+      printError(message(action === 'copy' ? 'copyMultipleToFile' : 'moveMultipleToFile'))
+      return { done: 0, siteChanged: false }
+    }
+    const state = { all: overwriteAll }
+    return runBatch(
+      files,
+      (file) => {
+        if (action === 'copy') print(file.name)
+        return withOverwritePrompt(
+          file.name,
+          (overwrite) => post(`/api/fs/${action}`, { from: file.path, to, overwrite }),
+          state,
+        )
+      },
+      (_file, data) => {
+        if (action === 'move') reportMoved(data)
+      },
+    )
+  }
+
+  const reportMoved = (data) => {
+    print(message('moveOk', { from: data.from, to: data.path }))
+    if (isSameOrInside(cwd.value, data.from)) cwd.value = `${data.path}${cwd.value.slice(data.from.length)}`
+  }
+
   const copyWithinDrive = async (source, destination, overwriteAll) => {
     const from = resolveArg(source)
     if (!from) return
     const to = resolveArg(destination || '.')
     if (!to) return
+    if (hasWildcard(parentDosPath(from).name)) {
+      const { done, siteChanged } = await copyOrMoveMatches('copy', from, source, to, overwriteAll)
+      print(`${SUMMARY_INDENT}${message('filesCopied', { count: done })}`)
+      printRefreshHint(siteChanged)
+      return
+    }
     const name = from.split('\\').pop()
     const result = await withOverwritePrompt(name, (overwrite) => post('/api/fs/copy', { from, to, overwrite }), {
       all: overwriteAll,
@@ -346,6 +476,12 @@ export const useDosShell = ({ onExit, pickFiles }) => {
         return
       }
       if (!requireAdminSession()) return
+      if (hasWildcard(parentDosPath(path).name)) {
+        const files = await expandFiles(path, paths[0], { includeHidden: true })
+        const { siteChanged } = await runBatch(files, (file) => post('/api/fs/attrib', { path: file.path, ...patch }))
+        printRefreshHint(siteChanged)
+        return
+      }
       await runWrite('/api/fs/attrib', { path, ...patch }, paths[0])
     },
 
@@ -387,14 +523,30 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       if (!assertSwitches(switches, ['A'])) return
       const path = resolveArg(args[0] || '.')
       if (!path) return
+      const options = {
+        showHidden: switches.includes('A'),
+        labels: dos.dir,
+        volumeLabel: dos.volumeLabel,
+        volumeSerial: dos.volumeSerial,
+      }
+      const { parent, name } = parentDosPath(path)
       try {
-        const listing = await $fetch('/api/fs/list', { query: { path } })
-        formatDirListing(listing, {
-          showHidden: switches.includes('A'),
-          labels: dos.dir,
-          volumeLabel: dos.volumeLabel,
-          volumeSerial: dos.volumeSerial,
-        }).forEach((line) => print(line))
+        if (!hasWildcard(name)) {
+          try {
+            const listing = await $fetch('/api/fs/list', { query: { path } })
+            formatDirListing(listing, options).forEach((line) => print(line))
+            return
+          } catch (error) {
+            if (errorCode(error) !== 'NOT_A_DIR') throw error
+          }
+        }
+        const listing = await $fetch('/api/fs/list', { query: { path: parent } })
+        const entries = listing.entries.filter((e) => (options.showHidden || !e.hidden) && matchesWildcard(e.name, name))
+        if (!entries.length) {
+          printError(message('fileNotFound', { name: args[0] }))
+          return
+        }
+        formatDirListing({ ...listing, entries }, { ...options, hideDots: true }).forEach((line) => print(line))
       } catch (error) {
         reportFsError(error, args[0] || path)
       }
@@ -404,7 +556,43 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
       const path = resolveArg(args[0])
       if (!path) return
-      await runWrite('/api/fs/delete', { path, type: 'file' }, args[0])
+      let pattern = path
+      if (!hasWildcard(parentDosPath(path).name)) {
+        const result = await post('/api/fs/delete', { path, type: 'file' })
+        if (result.code !== 'IS_A_DIR') {
+          reportWrite(result, args[0])
+          return
+        }
+        pattern = joinDosPath(path, '*.*')
+      }
+      if (['*', '*.*'].includes(parentDosPath(pattern).name)) {
+        if ((await ask(message('deleteAllPrompt'), YES_NO_ANSWERS)) !== 'Y') return
+      }
+      const files = await expandFiles(pattern, args[0])
+      const { siteChanged } = await runBatch(files, (file) => post('/api/fs/delete', { path: file.path, type: 'file' }))
+      printRefreshHint(siteChanged)
+    },
+
+    async DELTREE({ args, switches }) {
+      if (!assertSwitches(switches, ['Y']) || !requireArgCount(args, 1) || !requireAdminSession()) return
+      const path = resolveArg(args[0])
+      if (!path) return
+      if (isSameOrInside(cwd.value, path)) {
+        printError(message('removeCurrentDir', { name: args[0] }))
+        return
+      }
+      const type = await entryType(path)
+      if (!type) {
+        printError(message('fileNotFound', { name: args[0] }))
+        return
+      }
+      if (!switches.includes('Y')) {
+        const promptKey = type === 'dir' ? 'deltreeDirPrompt' : 'deltreeFilePrompt'
+        if ((await ask(message(promptKey, { name: args[0] }), YES_NO_ANSWERS)) !== 'Y') return
+      }
+      const result = await post('/api/fs/delete', { path, recursive: true })
+      if (!result.error) print(message('deleting', { name: args[0] }))
+      reportWrite(result, args[0])
     },
 
     async ECHO({ rest }) {
@@ -499,6 +687,31 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       })
     },
 
+    async MOVE({ args, switches }) {
+      if (!assertSwitches(switches, ['Y']) || !requireArgCount(args, 2) || !requireAdminSession()) return
+      const from = resolveArg(args[0])
+      if (!from) return
+      const to = resolveArg(args[1])
+      if (!to) return
+      const overwriteAll = switches.includes('Y')
+      if (hasWildcard(parentDosPath(from).name)) {
+        const { siteChanged } = await copyOrMoveMatches('move', from, args[0], to, overwriteAll)
+        printRefreshHint(siteChanged)
+        return
+      }
+      const result = await withOverwritePrompt(args[0], (overwrite) => post('/api/fs/move', { from, to, overwrite }), {
+        all: overwriteAll,
+      })
+      if (result.skipped) return
+      if (result.error) {
+        reportFsError(result.error, args[0])
+        return
+      }
+      printWarnings(result.data)
+      reportMoved(result.data)
+      printRefreshHint(result.data?.siteChanged)
+    },
+
     async RD({ args, switches }) {
       if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
       const path = resolveArg(args[0])
@@ -523,6 +736,14 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
       const path = resolveArg(source)
       if (!path) return
+      if (hasWildcard(parentDosPath(path).name) || hasWildcard(newName)) {
+        const files = (await expandFiles(path, source)).filter((f) => applyRenamePattern(f.name, newName) !== f.name)
+        const { siteChanged } = await runBatch(files, (file) =>
+          post('/api/fs/rename', { path: file.path, newName: applyRenamePattern(file.name, newName) }),
+        )
+        printRefreshHint(siteChanged)
+        return
+      }
       const result = await runWrite('/api/fs/rename', { path, newName }, source, {
         EXISTS: 'duplicateFileName',
         NOT_FOUND: 'duplicateFileName',
@@ -604,7 +825,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     if (mode.value === 'confirm') {
       print(`${question.value}${input}`)
       const answer = input.trim().charAt(0).toUpperCase()
-      if (!CONFIRM_ANSWERS.includes(answer)) return
+      if (!allowedAnswers.includes(answer)) return
       mode.value = 'busy'
       const resolve = answerQuestion
       answerQuestion = null
