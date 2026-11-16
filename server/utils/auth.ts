@@ -135,9 +135,9 @@ export const createSession = (event: H3Event): number => {
  * @param {H3Event} event
  * @returns {{ expiresAt: number } | null}
  * @example
- *   const session = getSession(event)
+ *   const session = getAdminSession(event)
  */
-export const getSession = (event: H3Event): { expiresAt: number } | null => {
+export const getAdminSession = (event: H3Event): { expiresAt: number } | null => {
   const token = getCookie(event, SESSION_COOKIE_NAME)
   if (!token) return null
   const db = useDb()
@@ -175,7 +175,7 @@ export const destroySession = (event: H3Event): void => {
  * @example
  *   const includeHidden = isAdmin(event)
  */
-export const isAdmin = (event: H3Event): boolean => getSession(event) !== null
+export const isAdmin = (event: H3Event): boolean => getAdminSession(event) !== null
 
 /**
  * Guards admin-only endpoints.
@@ -187,7 +187,7 @@ export const isAdmin = (event: H3Event): boolean => getSession(event) !== null
  *   requireAdmin(event)
  */
 export const requireAdmin = (event: H3Event): { expiresAt: number } => {
-  const session = getSession(event)
+  const session = getAdminSession(event)
   if (!session) throwAuthError(401, 'UNAUTHORIZED')
   return session as { expiresAt: number }
 }
