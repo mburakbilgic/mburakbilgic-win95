@@ -4,7 +4,7 @@ export const useMailStore = defineStore('mail', {
     state: () => ({
         mailContent: "",
         mailSender: "",
-        mailSubject: "New Message",
+        mailSubject: "",
     }),
     actions: {
         /**
@@ -32,12 +32,12 @@ export const useMailStore = defineStore('mail', {
         },
 
         /**
-         * Clears the draft back to the empty "New Message" state.
+         * Clears the draft back to an empty state.
          */
         resetMail() {
             this.mailContent = ""
             this.mailSender = ""
-            this.mailSubject = "New Message"
+            this.mailSubject = ""
         }
     }
 })

@@ -22,13 +22,14 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
   ],
   runtimeConfig: {
+    mailSmtpHost: '',
+    mailSmtpPort: '',
+    mailSmtpUser: '',
+    mailSmtpPass: '',
+    mailTo: '',
     public: {
       resumePdfUrl: process.env.NUXT_PUBLIC_RESUME_PDF_URL || '',
       resumePreviewUrl: process.env.NUXT_PUBLIC_RESUME_PREVIEW_URL || '',
-      mailFormAction: process.env.NUXT_PUBLIC_MAIL_FORM_ACTION || '',
-      mailEntrySubject: process.env.NUXT_PUBLIC_MAIL_ENTRY_SUBJECT || '',
-      mailEntrySender: process.env.NUXT_PUBLIC_MAIL_ENTRY_SENDER || '',
-      mailEntryContent: process.env.NUXT_PUBLIC_MAIL_ENTRY_CONTENT || '',
       photoUrls,
     },
   },

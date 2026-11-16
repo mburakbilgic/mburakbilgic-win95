@@ -16,13 +16,8 @@ import { useContent } from '@/composables/useContent'
 import { useImagePath } from '@/composables/useImagePath'
 import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
 
-const { site } = useContent()
+const { site, mail } = useContent()
 const { iconPath } = useImagePath()
-const runtimeConfig = useRuntimeConfig()
-const mailFormAction = runtimeConfig.public.mailFormAction
-const mailEntrySubject = runtimeConfig.public.mailEntrySubject
-const mailEntrySender = runtimeConfig.public.mailEntrySender
-const mailEntryContent = runtimeConfig.public.mailEntryContent
 
 const props = withDefaults(
     defineProps<{
@@ -114,14 +109,12 @@ const closeWindow = () => {
     windowsStore.setWindowState(payload)
 }
 
-let sendTimeout: ReturnType<typeof setTimeout> | null = null
-
 const mailSubject = computed({
     get: () => mailStore.mailSubject,
-    set: (v: string) => {
-        mailStore.setMailSubject(v.replace(/\s/g, '') === '' ? 'New Message' : v)
-    },
+    set: (v: string) => mailStore.setMailSubject(v),
 })
+
+const headerSubject = computed(() => mailStore.mailSubject.trim() || mail.defaultSubject)
 
 const mailSender = computed({
     get: () => mailStore.mailSender,
@@ -133,14 +126,44 @@ const mailContent = computed({
     set: (v: string) => mailStore.setMailContent(v),
 })
 
-const sendEmail = () => {
-    if (sendTimeout) clearTimeout(sendTimeout)
-    sendTimeout = setTimeout(() => {
-        sendTimeout = null
-        closeWindow()
+const honeypot = ref('')
+const isSending = ref(false)
+const dialog = ref<{ title: string; message: string; success: boolean } | null>(null)
+
+const errorMessage = (error: unknown): string => {
+    const code = (error as { data?: { data?: { code?: string } } })?.data?.data?.code
+    const messages = mail.error.messages as Record<string, string>
+    return (code && messages[code]) || messages.UNKNOWN
+}
+
+const sendEmail = async () => {
+    if (isSending.value) return
+    isSending.value = true
+    try {
+        await $fetch('/api/mail', {
+            method: 'POST',
+            body: {
+                subject: mailStore.mailSubject,
+                sender: mailStore.mailSender,
+                content: mailStore.mailContent,
+                website: honeypot.value,
+            },
+        })
+        dialog.value = { title: mail.success.title, message: mail.success.message, success: true }
+    } catch (error) {
+        dialog.value = { title: mail.error.title, message: errorMessage(error), success: false }
+    } finally {
+        isSending.value = false
+    }
+}
+
+const closeDialog = () => {
+    const wasSuccess = dialog.value?.success
+    dialog.value = null
+    if (wasSuccess) {
         mailStore.resetMail()
-        alert("Email Sent!")
-    }, 500)
+        closeWindow()
+    }
 }
 
 let isDragging = false;
@@ -217,10 +240,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     if (draggableWindow) draggableWindow.unset()
-    if (sendTimeout) {
-        clearTimeout(sendTimeout)
-        sendTimeout = null
-    }
 })
 </script>
 
@@ -229,8 +248,7 @@ onBeforeUnmount(() => {
             'fullscreen': window.fullscreen == true,
             'minimize': window.fullscreen == 'minimize',
         }" @click="setActiveWindow" @dragstart="setActiveWindow" @click.native="setActiveWindow">
-    <iframe name="hidden_iframe" id="hidden_iframe" style="display: none"></iframe>
-    <form @submit="sendEmail" :action="mailFormAction" class="window-style" id="container" target="hidden_iframe">
+    <form @submit.prevent="sendEmail" class="window-style" id="container" novalidate>
         <div id="top-bar" class="top-bar-window" :class="
             windowsStore.activeWindow == window.windowId
                 ? 'top-bar'
@@ -269,37 +287,53 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="send-bar">
-            <button type="submit" class="sent" style="z-index: 10">
+            <button type="submit" class="sent" style="z-index: 10" :disabled="isSending">
                 <span class="border-box">
                     <img src="@/assets/Mail/send.png" class="icon-image" />
-                    <p style="margin-top: 2px; color: black">Send</p>
+                    <p style="margin-top: 2px; color: black">{{ isSending ? mail.sendingLabel : mail.sendLabel }}</p>
                 </span>
             </button>
         </div>
 
         <div class="content">
             <div class="container-details">
-                <div class="header">{{ mailStore.mailSubject }}</div>
+                <div class="header">{{ headerSubject }}</div>
                 <hr />
                 <div class="subject-container">
-                    <p style="margin: 8px">To:</p>
+                    <p style="margin: 8px">{{ mail.toLabel }}</p>
                     <div class="receipient">{{ site.mailRecipientLabel }}</div>
                 </div>
                 <hr />
                 <div class="subject-container">
-                    <p style="margin: 8px">Subject:</p>
-                    <input :name="mailEntrySubject" class="subject" v-model="mailSubject" type="text" required="true" />
+                    <p style="margin: 8px">{{ mail.subjectLabel }}</p>
+                    <input name="subject" class="subject" v-model="mailSubject" type="text" maxlength="200" />
                 </div>
                 <hr />
                 <div class="from-container" style="margin-bottom: 2px">
-                    <p style="margin: 8px">From:</p>
-                    <input :name="mailEntrySender" class="subject" v-model="mailSender" type="email" required="true" />
+                    <p style="margin: 8px">{{ mail.fromLabel }}</p>
+                    <input name="sender" class="subject" v-model="mailSender" type="email" maxlength="254" />
                 </div>
             </div>
 
-            <textarea :name="mailEntryContent" v-model="mailContent" required="true"></textarea>
+            <textarea name="content" v-model="mailContent" maxlength="5000"></textarea>
+            <input v-model="honeypot" name="website" class="honeypot" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
         </div>
     </form>
+
+    <div v-if="dialog" class="dialog-overlay" @click.stop>
+        <div class="dialog" role="alertdialog" :aria-label="dialog.title">
+            <div class="top-bar top-bar-window">
+                <div class="window-name">{{ dialog.title }}</div>
+            </div>
+            <div class="dialog-body">
+                <span class="dialog-icon" :class="dialog.success ? 'dialog-icon-info' : 'dialog-icon-error'">{{ dialog.success ? 'i' : '×' }}</span>
+                <span class="dialog-message">{{ dialog.message }}</span>
+            </div>
+            <div class="dialog-actions">
+                <button type="button" class="sent dialog-ok" @click="closeDialog">{{ mail.okLabel }}</button>
+            </div>
+        </div>
+    </div>
 </div>
 </template>
 
@@ -496,6 +530,82 @@ hr {
 
 input {
     outline: none;
+}
+
+.honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.sent:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.dialog-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.1);
+    z-index: 20;
+}
+
+.dialog {
+    min-width: 260px;
+    max-width: 90%;
+    background: rgb(192, 192, 192);
+    border-top: solid rgb(250, 250, 250) 1.5px;
+    border-left: solid rgb(250, 250, 250) 1.5px;
+    border-bottom: solid rgb(90, 90, 90) 1.5px;
+    border-right: solid rgb(90, 90, 90) 1.5px;
+    box-shadow: 1.5px 1.5px black;
+}
+
+.dialog-body {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 14px 8px;
+    font-size: 14px;
+    color: black;
+}
+
+.dialog-icon {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    color: white;
+}
+
+.dialog-icon-info {
+    background: rgb(0, 0, 124);
+    font-family: serif;
+}
+
+.dialog-icon-error {
+    background: rgb(200, 0, 0);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 12px;
+}
+
+.dialog-ok {
+    min-width: 72px;
+    color: black;
 }
 
 textarea {

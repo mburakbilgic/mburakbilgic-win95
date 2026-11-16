@@ -5,6 +5,7 @@ import techMonolith from '@/content/tech-monolith.json'
 import projects from '@/content/projects.json'
 import photos from '@/content/photos.json'
 import windows from '@/content/windows.json'
+import mail from '@/content/mail.json'
 
 /**
  * Builds the folder tree by looking up the env key stored in each
@@ -38,6 +39,7 @@ const resolvePhotoFolders = (photoUrls) => {
  *   techMonolith: typeof techMonolith,
  *   projects: typeof projects,
  *   windows: typeof windows,
+ *   mail: typeof mail,
  *   photos: { folderSize: number, folders: Array<object> }
  * }}
  */
@@ -50,6 +52,7 @@ export const useContent = () => {
     techMonolith,
     projects,
     windows,
+    mail,
     photos: {
       folderSize: photos.folderSize,
       folders: resolvePhotoFolders(photoUrls),

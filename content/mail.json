@@ -1,0 +1,26 @@
+{
+  "defaultSubject": "New Message",
+  "sendLabel": "Send",
+  "sendingLabel": "Sending...",
+  "toLabel": "To:",
+  "subjectLabel": "Subject:",
+  "fromLabel": "From:",
+  "okLabel": "OK",
+  "success": {
+    "title": "Mail",
+    "message": "Your message has been sent. I'll get back to you soon!"
+  },
+  "error": {
+    "title": "Mail Error",
+    "messages": {
+      "INVALID_PAYLOAD": "The message could not be read. Please try again.",
+      "INVALID_SUBJECT": "Please enter a subject (max 200 characters).",
+      "INVALID_SENDER": "Please enter a valid e-mail address in the From field.",
+      "INVALID_CONTENT": "Please write a message (max 5000 characters).",
+      "RATE_LIMITED": "Too many messages. Please wait a few minutes and try again.",
+      "NOT_CONFIGURED": "The mail service is temporarily unavailable.",
+      "SEND_FAILED": "The message could not be delivered. Please try again later.",
+      "UNKNOWN": "Something went wrong. Please try again later."
+    }
+  }
+}
