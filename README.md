@@ -287,22 +287,52 @@ açar; seçtiğin dosyalar bulunduğun klasöre (ya da verdiğin hedefe) yüklen
 
 ### Değişiklik ne zaman sitede görünür?
 
-Bir komut sitenin gösterdiği içeriği değiştirdiyse DOS şunu yazar:
+Hemen. Bir komut sitenin gösterdiği içeriği değiştirdiyse DOS içeriği arka
+planda yeniden yükler ve şunu yazar:
 
 ```
-This change is visible on the site. Press F5 to refresh the page.
+The site has been updated.
 ```
 
-**F5** ile sayfayı yenile. Bu satır çıkmadıysa değişiklik yalnızca DOS'ta
-görünür; örneğin `DESKTOP` altında açılan klasörler şimdilik masaüstünde
-ikon olarak çıkmaz.
+Masaüstü ikonları, açık pencereler (Biography, Projects, Tech Monolith,
+Photos, klasör ve Notepad pencereleri) ve Start menüsü **F5'e basmadan**
+güncellenir. Silinen ya da gizlenen bir klasörün/dosyanın açık penceresi
+kendiliğinden kapanır. Bu satır çıkmadıysa değişiklik yalnızca DOS'ta görünür
+(ör. `.BAK` dosyası, sitenin okumadığı bir klasör).
+
+Nadiren bir pencere eski hali gösterirse (ör. `ABOUT.TXT`'deki `Intro:`
+satırı) pencereyi kapatıp aç ya da F5'e bas. Yeniden yükleme başarısız olursa
+DOS bunun yerine `Press F5 to refresh the page.` yazar.
+
+### Masaüstü
+
+`DESKTOP` klasörü masaüstünün kendisidir:
+
+- `.LNK` dosyaları → uygulama kısayolları (Biography, Projects…), `Order=` sırasıyla
+- Klasörler → klasör ikonu; çift tıklayınca Win95 gezgin penceresi açılır, içindeki klasörler de açılabilir
+- Metin dosyaları (`.TXT`, `.INI`, …) → çift tıklayınca **Notepad** (salt okunur; düzenleme DOS'ta `EDIT` ile)
+- Görseller → resim önizleme penceresi · PDF'ler → yeni sekme
+
+Kısayollardan sonra önce klasörler, sonra dosyalar alfabetik dizilir. Gizli
+(`ATTRIB +H`) öğeler görünmez. Aynı klasörü ya da dosyayı tekrar açmak yeni
+pencere açmaz, açık olanı öne getirir.
+
+```
+MD DESKTOP\NOTLAR
+EDIT DESKTOP\NOTLAR\YAPILACAK.TXT
+COPY A:\*.JPG DESKTOP\NOTLAR
+```
+
+Bu üç komuttan sonra masaüstünde `NOTLAR` klasörü belirir; içinde not ve
+görseller açılır. Notepad açıkken dosyayı `EDIT` ile değiştirirsen Notepad
+yeni hali gösterir.
 
 ### Sanal C: sürücüsü
 
 ```
 C:\MBURAKBILGIC
 ├── SITE.INI             site adı, başlık, konum, doğum yılı
-├── DESKTOP\*.LNK        masaüstü ikonları
+├── DESKTOP\             masaüstü: .LNK kısayollar, klasörler, dosyalar
 ├── BIO
 │   ├── ABOUT.TXT        hakkımda metni + CV bağlantısı
 │   ├── BADGES.INI       teknoloji rozetleri
@@ -369,7 +399,7 @@ Branch=main
 Description=Projenin tek satırlık açıklaması
 ```
 
-**F5** → Projects penceresinde yeni kutucuk. Kutucuğa tıklayınca
+**Sonuç:** Projects penceresinde yeni kutucuk. Kutucuğa tıklayınca
 `Owner/Repo/Branch`'teki README gösterilir. `Title=` yoksa proje atlanır.
 
 ### 2. Projeyi gizlemek veya kaldırmak
@@ -393,7 +423,7 @@ COPY A:\*.PDF
 ```
 
 Dosya penceresinden `mburakbilgic_en.pdf`'i seç; zaten varsa `Y` ile üzerine
-yaz. **F5** → Résumé penceresi, Start menüsündeki Résumé ve Biography'deki
+yaz. **Sonuç:** Résumé penceresi, Start menüsündeki Résumé ve Biography'deki
 bağlantı yeni dosyayı açar. Farklı adla yüklediysen `EDIT ABOUT.TXT` ile
 `ResumePath:` değerini o adla değiştir.
 
@@ -405,7 +435,7 @@ CD "PHOTOS\Yeni Albüm (25-26)"
 COPY A:\*.JPG
 ```
 
-Dosya penceresinde birden çok görsel seçebilirsin. **F5** → Photos
+Dosya penceresinde birden çok görsel seçebilirsin. **Sonuç:** Photos
 penceresinde yeni klasör. Görsel silmek için `DEL "Kapak.JPG"`, albümü
 tamamen kaldırmak için `CD \MBURAKBILGIC\PHOTOS` sonra
 `DELTREE "Yeni Albüm (25-26)"`.
@@ -868,22 +898,52 @@ choose are uploaded to the current folder (or to the destination you give).
 
 ### When does a change show up on the site?
 
-If a command changed what the site displays, DOS prints:
+Right away. If a command changed what the site displays, DOS reloads the
+content in the background and prints:
 
 ```
-This change is visible on the site. Press F5 to refresh the page.
+The site has been updated.
 ```
 
-Press **F5** to reload the page. If the line does not appear, the change is only
-visible in DOS; for example, folders created under `DESKTOP` do not show up as
-desktop icons yet.
+Desktop icons, open windows (Biography, Projects, Tech Monolith, Photos,
+folder and Notepad windows) and the Start menu update **without pressing F5**.
+An open window of a folder or file that was deleted or hidden closes by itself.
+If the line does not appear, the change is only visible in DOS (e.g. a `.BAK`
+file or a folder the site does not read).
+
+If a window occasionally still shows the old state (e.g. the `Intro:` line in
+`ABOUT.TXT`), close and reopen it or press F5. If the reload fails, DOS prints
+`Press F5 to refresh the page.` instead.
+
+### The desktop
+
+The `DESKTOP` folder is the desktop itself:
+
+- `.LNK` files → application shortcuts (Biography, Projects…), ordered by `Order=`
+- Folders → folder icons; double-click opens a Win95 Explorer window, and folders inside it open too
+- Text files (`.TXT`, `.INI`, …) → double-click opens **Notepad** (read-only; edit with `EDIT` in DOS)
+- Images → the image viewer · PDFs → a new browser tab
+
+After the shortcuts come folders, then files, alphabetically. Hidden
+(`ATTRIB +H`) items are not shown. Opening the same folder or file again does
+not open a second window; it brings the open one to the front.
+
+```
+MD DESKTOP\NOTES
+EDIT DESKTOP\NOTES\TODO.TXT
+COPY A:\*.JPG DESKTOP\NOTES
+```
+
+After these three commands a `NOTES` folder appears on the desktop; the note
+and the images open from inside it. If you change the file with `EDIT` while
+its Notepad is open, Notepad shows the new version.
 
 ### The virtual C: drive
 
 ```
 C:\MBURAKBILGIC
 ├── SITE.INI             site name, headline, location, birth year
-├── DESKTOP\*.LNK        desktop icons
+├── DESKTOP\             the desktop: .LNK shortcuts, folders, files
 ├── BIO
 │   ├── ABOUT.TXT        about text + résumé link
 │   ├── BADGES.INI       technology badges
@@ -950,7 +1010,7 @@ Branch=main
 Description=A one-line description of the project
 ```
 
-**F5** → a new tile in the Projects window. Clicking it shows the README from
+**Result:** a new tile in the Projects window. Clicking it shows the README from
 `Owner/Repo/Branch`. Without `Title=` the project is skipped.
 
 ### 2. Hide or remove a project
@@ -974,7 +1034,7 @@ COPY A:\*.PDF
 ```
 
 Pick `mburakbilgic_en.pdf` in the file picker; if it already exists, answer `Y`
-to overwrite. **F5** → the Résumé window, the Start menu Résumé entry and the
+to overwrite. **Result:** the Résumé window, the Start menu Résumé entry and the
 link in Biography open the new file. If you uploaded it under another name,
 `EDIT ABOUT.TXT` and change `ResumePath:` to that name.
 
@@ -986,7 +1046,7 @@ CD "PHOTOS\New Album (25-26)"
 COPY A:\*.JPG
 ```
 
-You can select several images in the file picker. **F5** → a new folder in the
+You can select several images in the file picker. **Result:** a new folder in the
 Photos window. Delete an image with `DEL "Cover.JPG"`; remove the whole album
 with `CD \MBURAKBILGIC\PHOTOS` and then `DELTREE "New Album (25-26)"`.
 
