@@ -24,7 +24,9 @@ export const fillTemplate = (template, values = {}) =>
  * `CD\` and `DIR/A` where no space follows the command.
  *
  * @param {string} input
- * @returns {{ command: string, args: string[], switches: string[] }}
+ * `rest` is the raw text after the command word (ECHO needs it verbatim).
+ *
+ * @returns {{ command: string, args: string[], switches: string[], rest: string }}
  * @example
  *   parseCommandLine('dir "C:\\My Docs" /a') // → { command: 'DIR', args: ['C:\\My Docs'], switches: ['A'] }
  */
@@ -46,7 +48,66 @@ export const parseCommandLine = (input) => {
     if (parts[0]) args.push(parts[0])
     parts.slice(1).filter(Boolean).forEach((s) => switches.push(s.toUpperCase()))
   })
-  return { command, args, switches }
+  return { command, args, switches, rest }
+}
+
+/**
+ * Splits a trailing output redirection (`> FILE` or `>> FILE`) off a
+ * command's raw text. A `>` inside double quotes is not a redirection.
+ *
+ * @param {string} text Raw text after the command word.
+ * @returns {{ text: string, target: string|null, append: boolean }}
+ *   `target` is null without redirection and `''` when `>` names no file.
+ * @example
+ *   splitRedirect(' Hello >> NOTES.TXT') // → { text: ' Hello', target: 'NOTES.TXT', append: true }
+ */
+export const splitRedirect = (text) => {
+  const match = text.match(/^((?:[^">]|"[^"]*")*)(>>?)\s*("[^"]*"|[^\s"]+)?\s*$/)
+  if (!match) return { text, target: null, append: false }
+  return {
+    text: match[1].trimEnd(),
+    target: match[3] ? match[3].replace(/^"|"$/g, '') : '',
+    append: match[2] === '>>',
+  }
+}
+
+/**
+ * Formats one ATTRIB output line in the Windows 95 column layout. The
+ * archive and system columns stay blank: this file system has neither.
+ *
+ * @param {{ hidden: boolean, readonly: boolean }} entry
+ * @param {string} path Canonical path printed after the attribute columns.
+ * @returns {string}
+ * @example
+ *   formatAttribLine({ hidden: true, readonly: false }, 'C:\\SECRET.TXT') // → '      H      C:\\SECRET.TXT'
+ */
+export const formatAttribLine = (entry, path) =>
+  `      ${entry.hidden ? 'H' : ' '}${entry.readonly ? 'R' : ' '}     ${path}`
+
+/**
+ * Joins a canonical directory path and an entry name.
+ *
+ * @param {string} dir e.g. `C:\` or `C:\MBURAKBILGIC`
+ * @param {string} name
+ * @returns {string}
+ * @example
+ *   joinDosPath('C:\\', 'AUTOEXEC.BAT') // → 'C:\\AUTOEXEC.BAT'
+ */
+export const joinDosPath = (dir, name) => (dir.endsWith('\\') ? `${dir}${name}` : `${dir}\\${name}`)
+
+/**
+ * Whether `path` is `ancestor` itself or lies inside it (case-insensitive).
+ *
+ * @param {string} path
+ * @param {string} ancestor
+ * @returns {boolean}
+ * @example
+ *   isSameOrInside('C:\\MBURAKBILGIC\\BIO', 'c:\\mburakbilgic') // → true
+ */
+export const isSameOrInside = (path, ancestor) => {
+  const p = path.toUpperCase()
+  const a = ancestor.toUpperCase().replace(/\\$/, '')
+  return p === a || p.startsWith(`${a}\\`)
 }
 
 /**

@@ -1,11 +1,31 @@
 import { computed, ref } from 'vue'
 import dos from '@/content/dos.json'
 import { DOS_HISTORY_MAX } from '@/constants/ui'
-import { fillTemplate, formatDirListing, formatTree, parseCommandLine, resolveDosPath } from '@/composables/dosFormat'
+import {
+  fillTemplate,
+  formatAttribLine,
+  formatDirListing,
+  formatTree,
+  isSameOrInside,
+  joinDosPath,
+  parseCommandLine,
+  resolveDosPath,
+  splitRedirect,
+} from '@/composables/dosFormat'
 
 const PAYLOAD_TOO_LARGE = 413
 const SUMMARY_INDENT = '        '
 const CONFIRM_ANSWERS = ['Y', 'N', 'A']
+const ECHO_DELIMITER = /[\s.,:;=+/([\]]/
+const ATTRIB_FLAG = /^([+-])([RH])$/i
+const RENAME_INVALID_NAME = /[\\/:*?]/
+const DRIVE_ROOT_LENGTH = 3
+
+const parentDosPath = (path) => {
+  const index = path.lastIndexOf('\\')
+  const parentLength = index === DRIVE_ROOT_LENGTH - 1 ? DRIVE_ROOT_LENGTH : index
+  return { parent: path.slice(0, parentLength), name: path.slice(index + 1) }
+}
 
 const errorCode = (error) =>
   error?.data?.data?.code || error?.data?.statusMessage || (error?.statusCode === PAYLOAD_TOO_LARGE ? 'TOO_LARGE' : '')
@@ -81,6 +101,18 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     return true
   }
 
+  const requireArgCount = (args, count) => {
+    if (args.length < count) {
+      printError(message('requiredParameter'))
+      return false
+    }
+    if (args.length > count) {
+      printError(message('tooManyParameters', { param: args[count] }))
+      return false
+    }
+    return true
+  }
+
   const ask = (text) =>
     new Promise((resolve) => {
       question.value = text
@@ -129,6 +161,46 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       return { data: await $fetch(url, { method: 'POST', body }) }
     } catch (error) {
       return { error, code: errorCode(error) }
+    }
+  }
+
+  /**
+   * Sends one admin write request and prints its outcome the DOS way:
+   * nothing on success except content warnings and the F5 hint.
+   *
+   * @param {string} url
+   * @param {object} body
+   * @param {string} name Argument as typed, used in error messages.
+   * @param {Record<string, string>} [errorMessages] Error code → dos.json message key overrides.
+   * @returns {Promise<object|null>} Response data, or null on error.
+   */
+  const runWrite = async (url, body, name, errorMessages = {}) => {
+    const result = await post(url, body)
+    if (result.error) {
+      const key = errorMessages[result.code]
+      if (key) printError(message(key, { name }))
+      else reportFsError(result.error, name)
+      return null
+    }
+    printWarnings(result.data)
+    print(message('refreshHint'), 'dim')
+    return result.data
+  }
+
+  const showAttributes = async (path, typed) => {
+    const target = path ? parentDosPath(path) : { parent: cwd.value, name: '' }
+    try {
+      const listing = await $fetch('/api/fs/list', { query: { path: target.parent } })
+      const entries = target.name
+        ? listing.entries.filter((e) => e.name.toUpperCase() === target.name.toUpperCase())
+        : listing.entries.filter((e) => e.type === 'file')
+      if (!entries.length) {
+        printError(message('fileNotFound', { name: typed || '*.*' }))
+        return
+      }
+      entries.forEach((e) => print(formatAttribLine(e, joinDosPath(listing.path, e.name))))
+    } catch (error) {
+      reportFsError(error, typed)
     }
   }
 
@@ -202,6 +274,37 @@ export const useDosShell = ({ onExit, pickFiles }) => {
   }
 
   const commands = {
+    async ATTRIB({ args, switches }) {
+      if (!assertSwitches(switches, [])) return
+      const flags = args.filter((a) => /^[+-]/.test(a))
+      const paths = args.filter((a) => !/^[+-]/.test(a))
+      if (paths.length > 1) {
+        printError(message('tooManyParameters', { param: paths[1] }))
+        return
+      }
+      const patch = {}
+      for (const flag of flags) {
+        const match = flag.match(ATTRIB_FLAG)
+        if (!match) {
+          printError(message('invalidParameter', { param: flag }))
+          return
+        }
+        patch[match[2].toUpperCase() === 'R' ? 'readonly' : 'hidden'] = match[1] === '+'
+      }
+      const path = paths.length ? resolveArg(paths[0]) : null
+      if (paths.length && !path) return
+      if (!flags.length) {
+        await showAttributes(path, paths[0])
+        return
+      }
+      if (!paths.length) {
+        printError(message('requiredParameter'))
+        return
+      }
+      if (!requireAdminSession()) return
+      await runWrite('/api/fs/attrib', { path, ...patch }, paths[0])
+    },
+
     async CD({ args }) {
       if (!args.length) {
         print(cwd.value)
@@ -252,6 +355,37 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
     },
 
+    async DEL({ args, switches }) {
+      if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
+      const path = resolveArg(args[0])
+      if (!path) return
+      await runWrite('/api/fs/delete', { path, type: 'file' }, args[0])
+    },
+
+    async ECHO({ rest }) {
+      const { text, target, append } = splitRedirect(rest)
+      const output = !text.trim() && !text.startsWith('.')
+        ? message('echoOn')
+        : ECHO_DELIMITER.test(text.charAt(0)) ? text.slice(1) : text
+      if (target === null) {
+        print(output)
+        return
+      }
+      if (!target) {
+        printError(message('syntaxError'))
+        return
+      }
+      if (!requireAdminSession()) return
+      const path = resolveArg(target)
+      if (!path) return
+      await runWrite(
+        '/api/fs/write',
+        { path, content: `${output}\n`, mode: append ? 'append' : 'overwrite' },
+        target,
+        { NOT_FOUND: 'invalidPath' },
+      )
+    },
+
     EXIT() {
       onExit()
     },
@@ -278,6 +412,49 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       admin.value = false
       expiresAt.value = null
       print(message('loggedOut'))
+    },
+
+    async MD({ args, switches }) {
+      if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
+      const path = resolveArg(args[0])
+      if (!path) return
+      await runWrite('/api/fs/mkdir', { path }, args[0], {
+        EXISTS: 'unableToCreateDir',
+        NOT_FOUND: 'unableToCreateDir',
+        NOT_A_DIR: 'unableToCreateDir',
+        INVALID_NAME: 'unableToCreateDir',
+      })
+    },
+
+    async RD({ args, switches }) {
+      if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
+      const path = resolveArg(args[0])
+      if (!path) return
+      if (isSameOrInside(cwd.value, path)) {
+        printError(message('removeCurrentDir', { name: args[0] }))
+        return
+      }
+      await runWrite('/api/fs/delete', { path, type: 'dir' }, args[0], {
+        NOT_FOUND: 'rdFailed',
+        NOT_A_DIR: 'rdFailed',
+        NOT_EMPTY: 'rdFailed',
+      })
+    },
+
+    async REN({ args, switches }) {
+      if (!assertSwitches(switches, []) || !requireArgCount(args, 2) || !requireAdminSession()) return
+      const [source, newName] = args
+      if (RENAME_INVALID_NAME.test(newName)) {
+        printError(message('invalidParameter', { param: newName }))
+        return
+      }
+      const path = resolveArg(source)
+      if (!path) return
+      const result = await runWrite('/api/fs/rename', { path, newName }, source, {
+        EXISTS: 'duplicateFileName',
+        NOT_FOUND: 'duplicateFileName',
+      })
+      if (result && isSameOrInside(cwd.value, path)) cwd.value = `${result.path}${cwd.value.slice(path.length)}`
     },
 
     async TREE({ args, switches }) {
@@ -324,6 +501,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       print('')
     },
   }
+  Object.assign(commands, { MKDIR: commands.MD, RMDIR: commands.RD, ERASE: commands.DEL, RENAME: commands.REN })
 
   const login = async (password) => {
     try {

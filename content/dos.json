@@ -41,7 +41,14 @@
     "copyOntoItself": "File cannot be copied onto itself",
     "binaryFile": "{name} is a binary file ({size} bytes). Open it from the desktop to view it.",
     "contentWarning": "Warning: {text}",
-    "refreshHint": "Press F5 to refresh the desktop and see the change."
+    "refreshHint": "Press F5 to refresh the desktop and see the change.",
+    "unableToCreateDir": "Unable to create directory",
+    "rdFailed": "Invalid path, not directory,\nor directory not empty",
+    "removeCurrentDir": "Attempt to remove current directory - {name}",
+    "duplicateFileName": "Duplicate file name or file not found",
+    "invalidParameter": "Invalid parameter - {param}",
+    "syntaxError": "Syntax error",
+    "echoOn": "ECHO is on"
   },
   "dir": {
     "volume": " Volume in drive C is {label}",
@@ -59,6 +66,10 @@
   },
   "help": [
     {
+      "command": "ATTRIB",
+      "text": "Displays or changes file attributes. ATTRIB [+R|-R] [+H|-H] [path]"
+    },
+    {
       "command": "CD",
       "text": "Displays the name of or changes the current directory."
     },
@@ -71,8 +82,16 @@
       "text": "Copies files. COPY A:\\*.* [destination] uploads from your computer."
     },
     {
+      "command": "DEL",
+      "text": "Deletes a file (ERASE)."
+    },
+    {
       "command": "DIR",
       "text": "Displays a list of files and subdirectories. DIR [path] [/A]"
+    },
+    {
+      "command": "ECHO",
+      "text": "Displays a message. ECHO text > file writes it, >> appends it."
     },
     {
       "command": "EXIT",
@@ -89,6 +108,18 @@
     {
       "command": "LOGOUT",
       "text": "Signs out of the administrator session."
+    },
+    {
+      "command": "MD",
+      "text": "Creates a directory (MKDIR)."
+    },
+    {
+      "command": "RD",
+      "text": "Removes an empty directory (RMDIR)."
+    },
+    {
+      "command": "REN",
+      "text": "Renames a file or directory. REN [path]oldname newname (RENAME)"
     },
     {
       "command": "TREE",
