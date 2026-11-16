@@ -14,7 +14,18 @@ export interface VfsNode {
   updatedAt: string
 }
 
-export type VfsErrorCode = 'INVALID_PATH' | 'INVALID_NAME' | 'NOT_FOUND' | 'NOT_A_DIR' | 'EXISTS'
+export type VfsErrorCode =
+  | 'INVALID_PATH'
+  | 'INVALID_NAME'
+  | 'NOT_FOUND'
+  | 'NOT_A_DIR'
+  | 'IS_A_DIR'
+  | 'EXISTS'
+  | 'NOT_EMPTY'
+  | 'READ_ONLY'
+  | 'PROTECTED'
+  | 'TOO_LARGE'
+  | 'INVALID_MOVE'
 
 export class VfsError extends Error {
   constructor(public code: VfsErrorCode, message: string) {
@@ -170,7 +181,19 @@ export const vfsNodePath = (node: VfsNode): string => {
  */
 export const throwVfsHttpError = (error: unknown): never => {
   if (!(error instanceof VfsError)) throw error
-  const statusCode = { INVALID_PATH: 400, INVALID_NAME: 400, NOT_A_DIR: 400, NOT_FOUND: 404, EXISTS: 409 }[error.code]
+  const statusCode = {
+    INVALID_PATH: 400,
+    INVALID_NAME: 400,
+    NOT_A_DIR: 400,
+    IS_A_DIR: 400,
+    INVALID_MOVE: 400,
+    NOT_FOUND: 404,
+    EXISTS: 409,
+    NOT_EMPTY: 409,
+    READ_ONLY: 403,
+    PROTECTED: 403,
+    TOO_LARGE: 413,
+  }[error.code]
   throw createError({ statusCode, statusMessage: error.code, data: { code: error.code } })
 }
 
@@ -275,4 +298,123 @@ export const fileExtension = (name: string): string => {
 export const baseName = (name: string): string => {
   const dot = name.lastIndexOf('.')
   return dot > 0 ? name.slice(0, dot) : name
+}
+
+export const VFS_FILE_MAX_BYTES = 256 * 1024
+
+/**
+ * Loads a node by id.
+ *
+ * @param {number} id
+ * @returns {VfsNode | null}
+ * @example
+ *   getNodeById(node.parentId)
+ */
+export const getNodeById = (id: number): VfsNode | null => {
+  const row = useDb().prepare('SELECT * FROM nodes WHERE id = ?').get(id) as NodeRow | undefined
+  return row ? toNode(row) : null
+}
+
+/**
+ * Splits an absolute path into its parent directory node and the final
+ * name, without requiring the final segment to exist (for MD, writes,
+ * copy/move targets).
+ *
+ * @param {string} path
+ * @returns {{ parent: VfsNode, name: string }}
+ * @throws {VfsError} INVALID_PATH for the drive root, NOT_FOUND / NOT_A_DIR for a bad parent.
+ * @example
+ *   const { parent, name } = resolveParent('C:\MBURAKBILGIC\DESKTOP\Notlar')
+ */
+export const resolveParent = (path: string): { parent: VfsNode; name: string } => {
+  const segments = splitVfsPath(path)
+  const name = segments.pop()
+  if (!name) throw new VfsError('INVALID_PATH', 'Invalid path')
+  const parentPath = `${VFS_DRIVE}\\${segments.join('\\')}`
+  const parent = resolveVfsPath(parentPath, { includeHidden: true })
+  if (!parent) throw new VfsError('NOT_FOUND', `Path not found - ${parentPath}`)
+  if (parent.type !== 'dir') throw new VfsError('NOT_A_DIR', `${parent.name} is not a directory`)
+  return { parent, name }
+}
+
+/**
+ * Applies a partial update to a node and bumps `updated_at`.
+ *
+ * @param {number} id
+ * @param {{ name?: string, parentId?: number, content?: string, size?: number|null, hidden?: boolean, readonly?: boolean }} patch
+ * @returns {VfsNode}
+ * @throws {VfsError} INVALID_NAME when a new name is invalid.
+ * @example
+ *   updateNode(file.id, { content: 'Hello' })
+ */
+export const updateNode = (
+  id: number,
+  patch: { name?: string; parentId?: number; content?: string; size?: number | null; hidden?: boolean; readonly?: boolean },
+): VfsNode => {
+  if (patch.name !== undefined) assertValidName(patch.name)
+  const columns: Record<string, string> = {
+    name: 'name',
+    parentId: 'parent_id',
+    content: 'content',
+    size: 'size',
+    hidden: 'hidden',
+    readonly: 'readonly',
+  }
+  const sets: string[] = []
+  const values: unknown[] = []
+  Object.entries(patch).forEach(([key, value]) => {
+    if (value === undefined) return
+    sets.push(`${columns[key]} = ?`)
+    values.push(typeof value === 'boolean' ? (value ? 1 : 0) : value)
+  })
+  sets.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+  useDb().prepare(`UPDATE nodes SET ${sets.join(', ')} WHERE id = ?`).run(...values, id)
+  return getNodeById(id) as VfsNode
+}
+
+/**
+ * Deletes a node; directories take their whole subtree with them
+ * (ON DELETE CASCADE).
+ *
+ * @param {number} id
+ * @returns {void}
+ * @example
+ *   deleteNode(file.id)
+ */
+export const deleteNode = (id: number): void => {
+  useDb().prepare('DELETE FROM nodes WHERE id = ?').run(id)
+}
+
+/**
+ * Whether `ancestorId` is `nodeId` itself or one of its ancestors; used
+ * to stop a directory from being moved into its own subtree.
+ *
+ * @param {number} ancestorId
+ * @param {number} nodeId
+ * @returns {boolean}
+ * @example
+ *   isSameOrAncestor(dir.id, target.id)
+ */
+export const isSameOrAncestor = (ancestorId: number, nodeId: number): boolean => {
+  let current = getNodeById(nodeId)
+  while (current) {
+    if (current.id === ancestorId) return true
+    current = current.parentId === null ? null : getNodeById(current.parentId)
+  }
+  return false
+}
+
+/**
+ * Throws when text content exceeds the per-file limit.
+ *
+ * @param {string} content
+ * @returns {void}
+ * @throws {VfsError} TOO_LARGE
+ * @example
+ *   assertContentSize(body.content)
+ */
+export const assertContentSize = (content: string): void => {
+  if (Buffer.byteLength(content, 'utf8') > VFS_FILE_MAX_BYTES) {
+    throw new VfsError('TOO_LARGE', `File exceeds ${VFS_FILE_MAX_BYTES} bytes`)
+  }
 }

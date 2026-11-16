@@ -20,7 +20,7 @@ export const CONTENT_FILES = {
 
 const IMAGE_EXTENSIONS = new Set(['JPG', 'JPEG', 'PNG', 'GIF', 'WEBP', 'BMP'])
 
-type Warn = (message: string) => void
+type Warn = (path: string, message: string) => void
 
 const childOf = (dir: VfsNode | null, name: string): VfsNode | null => (dir ? findChild(dir.id, name) : null)
 
@@ -60,7 +60,7 @@ const buildBio = (home: VfsNode, warn: Warn) => {
     .map((file) => {
       const doc = parseHeaderDoc(file.content || '')
       if (!doc.headers.company) {
-        warn(`BIO\\JOBS\\${file.name}: missing "Company:" header, skipped`)
+        warn(`BIO\\JOBS\\${file.name}`, 'missing "Company:" header, skipped')
         return null
       }
       return {
@@ -88,7 +88,7 @@ const buildProjects = (home: VfsNode, warn: Warn) =>
     .map((file) => {
       const p = iniSection(parseIni(file.content || ''), 'Project')
       if (!p.title) {
-        warn(`PROJECTS\\${file.name}: missing [Project] Title=, skipped`)
+        warn(`PROJECTS\\${file.name}`, 'missing [Project] Title=, skipped')
         return null
       }
       return {
@@ -172,7 +172,7 @@ const buildSocial = (home: VfsNode, warn: Warn) =>
       const link = iniSection(sections, 'InternetShortcut')
       const menu = iniSection(sections, 'Menu')
       if (!link.url) {
-        warn(`SOCIAL\\${file.name}: missing [InternetShortcut] URL=, skipped`)
+        warn(`SOCIAL\\${file.name}`, 'missing [InternetShortcut] URL=, skipped')
         return null
       }
       const label = baseName(file.name)
@@ -193,7 +193,7 @@ const buildDesktop = (home: VfsNode, warn: Warn) =>
     .map((file) => {
       const s = iniSection(parseIni(file.content || ''), 'Shortcut')
       if (!s.target) {
-        warn(`DESKTOP\\${file.name}: missing [Shortcut] Target=, skipped`)
+        warn(`DESKTOP\\${file.name}`, 'missing [Shortcut] Target=, skipped')
         return null
       }
       return {
@@ -216,15 +216,18 @@ export type SiteContent = ReturnType<typeof buildSiteContent>
  * components consume. Malformed files are skipped (and logged) so a typo
  * typed in the DOS shell can never take the whole site down.
  *
+ * @param {{ onWarning?: (path: string, message: string) => void }} [options]
+ *   Receives skipped-file warnings (path relative to C:\MBURAKBILGIC);
+ *   defaults to logging them.
  * @returns {{ site: object, bio: object, projects: object[], techMonolith: object, photos: object, social: object[], desktop: object[] }}
  * @throws {Error} When the content tree has not been seeded.
  * @example
  *   const { bio, projects } = buildSiteContent()
  */
-export const buildSiteContent = () => {
+export const buildSiteContent = (options: { onWarning?: Warn } = {}) => {
   const home = findChild(getRootNode().id, CONTENT_HOME_DIR)
   if (!home) throw new Error(`${CONTENT_HOME_PATH} does not exist`)
-  const warn: Warn = (message) => console.warn(`[content] ${message}`)
+  const warn: Warn = options.onWarning || ((path, message) => console.warn(`[content] ${path}: ${message}`))
 
   return {
     site: buildSite(home),
@@ -235,4 +238,55 @@ export const buildSiteContent = () => {
     social: buildSocial(home, warn),
     desktop: buildDesktop(home, warn),
   }
+}
+
+const PROTECTED_PATHS = new Set(
+  [
+    `${VFS_DRIVE}\\`,
+    CONTENT_HOME_PATH,
+    ...Object.values(CONTENT_DIRS)
+      .filter((dir) => dir !== CONTENT_DIRS.jobs)
+      .map((dir) => `${CONTENT_HOME_PATH}\\${dir}`),
+    `${CONTENT_HOME_PATH}\\${CONTENT_DIRS.bio}\\${CONTENT_DIRS.jobs}`,
+  ].map((path) => path.toUpperCase()),
+)
+
+/**
+ * Whether a canonical path is one of the directories the site builder
+ * depends on; those cannot be deleted, renamed, moved or hidden.
+ *
+ * @param {string} canonicalPath As returned by `vfsNodePath`.
+ * @returns {boolean}
+ * @example
+ *   isProtectedPath('C:\\MBURAKBILGIC\\DESKTOP') // → true
+ */
+export const isProtectedPath = (canonicalPath: string): boolean => PROTECTED_PATHS.has(canonicalPath.toUpperCase())
+
+/**
+ * Rebuilds the site content and returns the warnings for files at or
+ * below the given paths, so a DOS write can tell the admin that the file
+ * they just touched will be skipped by the site.
+ *
+ * @param {string[]} canonicalPaths Paths touched by the write.
+ * @returns {string[]} e.g. `['PROJECTS\\x.INI: missing [Project] Title=, skipped']`
+ * @example
+ *   const warnings = collectContentWarnings([vfsNodePath(file)])
+ */
+export const collectContentWarnings = (canonicalPaths: string[]): string[] => {
+  const prefix = `${CONTENT_HOME_PATH}\\`.toUpperCase()
+  const touched = canonicalPaths.map((p) => p.toUpperCase())
+  const warnings: string[] = []
+  try {
+    buildSiteContent({
+      onWarning: (path, message) => {
+        const absolute = `${prefix}${path.toUpperCase()}`
+        if (touched.some((t) => absolute === t || absolute.startsWith(`${t}\\`))) {
+          warnings.push(`${path}: ${message}`)
+        }
+      },
+    })
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : String(error))
+  }
+  return warnings
 }
