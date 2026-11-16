@@ -25,7 +25,7 @@ const resolveSocialIcon = (iconFile) => {
       <img class="sidebar-image" src="@/assets/sidebar-image.png" />
     </div>
     <div class="socials">
-      <template v-for="link in social" :key="link.platform">
+      <template v-for="link in social" :key="link.id">
         <a :href="link.url" target="_blank">
           <div class="bar">
             <img class="social-image" :src="resolveSocialIcon(link.icon)" />

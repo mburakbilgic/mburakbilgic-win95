@@ -15,6 +15,17 @@ import { onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
 } from '@/stores/windows'
+import { useContentStore } from '@/stores/content'
+
+const contentStore = useContentStore()
+if (!contentStore.loaded) {
+  const { data, error } = await useFetch('/api/content')
+  if (error.value || !data.value) {
+    throw createError({ statusCode: 503, statusMessage: 'Content unavailable', fatal: true })
+  }
+  contentStore.setContent(data.value)
+}
+
 const windowsStore = useWindowsStore()
 const windows = windowsStore.windows
 

@@ -1,12 +1,18 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useWindowsStore } from '@/stores/windows'
 import { useImagePath } from '@/composables/useImagePath'
+import { useContent } from '@/composables/useContent'
 
 const NAVBAR_OFFSET_PX = 60
 
 const windowsStore = useWindowsStore()
 const { iconPath } = useImagePath()
+const { desktop } = useContent()
+
+const shortcuts = computed(() =>
+    desktop.filter((shortcut) => windowsStore.getWindowById(shortcut.target))
+)
 
 const gridHeight = ref("")
 
@@ -23,17 +29,16 @@ onMounted(() => {
 
 <template>
     <nav class="grid-container" :style="{ height: gridHeight }">
-    <li v-for="window in windowsStore.windows" :key="window.windowId">
+    <li v-for="shortcut in shortcuts" :key="shortcut.id">
       <button
         class="icon"
-        v-if="window.showInAppGrid != false"
-        @touchstart="openWindow(window.windowId)"
-        @dblclick="openWindow(window.windowId)"
+        @touchstart="openWindow(shortcut.target)"
+        @dblclick="openWindow(shortcut.target)"
       >
-      <img class="icon-image" :src="iconPath(window.iconImage)" :alt="window.altText" />
+      <img class="icon-image" :src="iconPath(shortcut.icon)" :alt="shortcut.name" />
         <div class="border-box">
           <p class="icon-text">
-            {{ window.displayName }}
+            {{ shortcut.name }}
           </p>
         </div>
       </button>

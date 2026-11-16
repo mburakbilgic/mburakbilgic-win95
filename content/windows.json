@@ -12,7 +12,6 @@
     "iconImage": "bio.png",
     "altText": "Biography",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true
   },
   {
@@ -28,7 +27,6 @@
     "iconImage": "msdos-32.png",
     "altText": "Projects",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true
   },
   {
@@ -44,7 +42,6 @@
     "iconImage": "resume.png",
     "altText": "Résumé",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true
   },
   {
@@ -60,7 +57,6 @@
     "iconImage": "file.png",
     "altText": "Photos",
     "fullscreen": false,
-    "showInAppGrid": false,
     "showInNavbar": false
   },
   {
@@ -76,7 +72,6 @@
     "iconImage": "techmonolith.webp",
     "altText": "Tech Monolith Corp.",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true
   },
   {
@@ -92,7 +87,6 @@
     "iconImage": "mail.png",
     "altText": "Mail",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true
   },
   {
@@ -110,7 +104,6 @@
     "iconImage": "photos.png",
     "altText": "Photos",
     "fullscreen": false,
-    "showInAppGrid": true,
     "showInNavbar": true,
     "photoFolder": true
   }

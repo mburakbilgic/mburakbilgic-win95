@@ -1,41 +1,37 @@
 import { defineStore } from "pinia";
 import { nextTick } from "vue";
 import windowsConfig from "@/content/windows.json";
-import photos from "@/content/photos.json";
+import { useContentStore } from "@/stores/content";
 
 /**
- * Resolves the `srcEnv` references in `content/photos.json` against the
- * given URL map (runtime config) to produce a folder tree ready for the
- * store state.
+ * Builds the window records from the bundled registry, applying the
+ * desktop shortcut (`C:\MBURAKBILGIC\DESKTOP\*.LNK`) that targets each
+ * window as an override for its name, icon and opening position, and
+ * injecting the photo tree into windows flagged with `photoFolder`.
  *
- * @param {Record<string,string>} photoUrls
+ * @param {Array<object>} configs `content/windows.json`
+ * @param {{ desktop: Array<object>, photos: { folders: Array<object>, folderSize: number } }} content
  * @returns {Array<object>}
  */
-const resolvePhotoFolders = (photoUrls) =>
-  photos.folders.map((folder) => ({
-    ...folder,
-    content: folder.content.map((item) => ({
-      ...item,
-      src: item.srcEnv ? (photoUrls[item.srcEnv] || "") : "",
-    })),
-  }));
-
-/**
- * When a window record is flagged with `photoFolder`, injects the
- * `photos.json` contents as `folderContent` and `folderSize` fields.
- *
- * @param {Array<object>} configs
- * @param {Record<string,string>} photoUrls
- * @returns {Array<object>}
- */
-const hydrateWindows = (configs, photoUrls) =>
-  configs.map((w) => {
-    if (!w.photoFolder) return w;
-    const { photoFolder, ...rest } = w;
+const hydrateWindows = (configs, content) =>
+  configs.map((config) => {
+    const { photoFolder, ...w } = config;
+    const shortcut = content.desktop.find((s) => s.target === w.windowId);
+    const hydrated = shortcut
+      ? {
+          ...w,
+          displayName: shortcut.name || w.displayName,
+          altText: shortcut.name || w.altText,
+          iconImage: shortcut.icon || w.iconImage,
+          positionX: shortcut.x || w.positionX,
+          positionY: shortcut.y || w.positionY,
+        }
+      : w;
+    if (!photoFolder) return hydrated;
     return {
-      ...rest,
-      folderContent: resolvePhotoFolders(photoUrls),
-      folderSize: photos.folderSize,
+      ...hydrated,
+      folderContent: content.photos.folders,
+      folderSize: content.photos.folderSize,
     };
   });
 
@@ -45,10 +41,7 @@ export const useWindowsStore = defineStore("windows", {
     activeWindows: [],
     zIndex: 2,
     photoFolderContent: [],
-    windows: hydrateWindows(
-      windowsConfig,
-      useRuntimeConfig().public.photoUrls || {},
-    ),
+    windows: hydrateWindows(windowsConfig, useContentStore()),
   }),
 
   getters: {
