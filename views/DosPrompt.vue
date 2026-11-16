@@ -9,10 +9,34 @@ import { DOS_PROMPT_WINDOW_ID } from '@/constants/ui'
 const windowsStore = useWindowsStore()
 const screenRef = ref(null)
 const inputRef = ref(null)
+const fileInputRef = ref(null)
 const input = ref('')
+
+const pickFiles = ({ multiple, accept }) =>
+  new Promise((resolve) => {
+    const el = fileInputRef.value
+    if (!el) {
+      resolve([])
+      return
+    }
+    const finish = (files) => {
+      el.removeEventListener('change', onChange)
+      el.removeEventListener('cancel', onCancel)
+      resolve(files)
+    }
+    const onChange = () => finish([...(el.files || [])])
+    const onCancel = () => finish([])
+    el.multiple = multiple
+    el.accept = accept
+    el.value = ''
+    el.addEventListener('change', onChange)
+    el.addEventListener('cancel', onCancel)
+    el.click()
+  })
 
 const shell = useDosShell({
   onExit: () => windowsStore.setWindowState({ windowState: 'close', windowId: DOS_PROMPT_WINDOW_ID }),
+  pickFiles,
 })
 const { lines, prompt, mode } = shell
 
@@ -90,6 +114,7 @@ onBeforeUnmount(() => {
           @keydown="onKeydown"
         />
       </div>
+      <input ref="fileInputRef" type="file" class="dos-hidden-input" tabindex="-1" aria-hidden="true" />
     </div>
   </DosFrame>
 </template>
@@ -122,6 +147,10 @@ onBeforeUnmount(() => {
 
 .dos-line.warn {
   color: #ffff55;
+}
+
+.dos-line.dim {
+  color: #7b7b7b;
 }
 
 .dos-input-line {

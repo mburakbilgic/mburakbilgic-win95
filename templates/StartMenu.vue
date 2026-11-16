@@ -4,7 +4,7 @@ import { useImagePath } from '@/composables/useImagePath'
 import { useWindowsStore } from '@/stores/windows'
 import { DOS_PROMPT_WINDOW_ID } from '@/constants/ui'
 
-const { social } = useContent()
+const { social, bio } = useContent()
 const { iconPath } = useImagePath()
 const windowsStore = useWindowsStore()
 const dosPromptWindow = windowsStore.getWindowById(DOS_PROMPT_WINDOW_ID)
@@ -12,7 +12,7 @@ const dosPromptWindow = windowsStore.getWindowById(DOS_PROMPT_WINDOW_ID)
 const openDosPrompt = () => {
   windowsStore.setWindowState({ windowState: 'open', windowId: DOS_PROMPT_WINDOW_ID })
 }
-const resumeUrl = useRuntimeConfig().public.resumePdfUrl
+const resumeUrl = bio.resumeUrl || useRuntimeConfig().public.resumePdfUrl
 
 const socialIcons = import.meta.glob('@/assets/iPhone-Icons/*.webp', { eager: true })
 

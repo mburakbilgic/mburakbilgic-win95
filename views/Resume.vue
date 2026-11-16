@@ -1,9 +1,12 @@
 <script setup>
 import { useWindowsStore } from '@/stores/windows'
+import { useContent } from '@/composables/useContent'
+
 const windowsStore = useWindowsStore()
+const { bio } = useContent()
 const runtimeConfig = useRuntimeConfig()
-const resumePdfUrl = runtimeConfig.public.resumePdfUrl
-const resumePreviewUrl = runtimeConfig.public.resumePreviewUrl
+const resumePdfUrl = bio.resumeUrl || runtimeConfig.public.resumePdfUrl
+const resumePreviewUrl = bio.resumeUrl || runtimeConfig.public.resumePreviewUrl
 </script>
 
 <template>

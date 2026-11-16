@@ -31,6 +31,42 @@ const visibleFiles = (dir: VfsNode | null, extension: string): VfsNode[] =>
 
 const readText = (node: VfsNode | null): string => (node && !node.hidden ? node.content || '' : '')
 
+const localBlobUrl = (dir: VfsNode | null, name: string): string => {
+  const node = dir && name ? findChild(dir.id, name) : null
+  return node && !node.hidden && node.type === 'file' && node.blobKey ? blobUrl(node) : ''
+}
+
+const lastUrlSegment = (url: string): string => {
+  const segment = url.split(/[?#]/)[0].split('/').pop() || ''
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
+/**
+ * Resolves an asset reference written in a content file:
+ *  - `C:\...` absolute path → that uploaded file,
+ *  - plain file name → uploaded file in the same directory,
+ *  - URL or site path → an uploaded file in the same directory with the
+ *    URL's file name if one exists (so uploading `onco-ai-web.PNG` next to
+ *    `PHASE1.TXT` replaces the old bucket URL without editing it),
+ *    otherwise the URL itself unless `localOnly` is set.
+ */
+const resolveAssetRef = (value: string | undefined, dir: VfsNode | null, options: { localOnly?: boolean } = {}): string => {
+  const ref = (value || '').trim()
+  if (!ref) return ''
+  if (/^[a-z]:[\\/]/i.test(ref)) {
+    const node = resolveVfsPath(ref)
+    return node && node.type === 'file' && node.blobKey ? blobUrl(node) : ''
+  }
+  if (/^https?:\/\//i.test(ref) || ref.startsWith('/')) {
+    return localBlobUrl(dir, lastUrlSegment(ref)) || (options.localOnly ? '' : ref)
+  }
+  return localBlobUrl(dir, ref)
+}
+
 const toInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt(value || '', 10)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -80,6 +116,7 @@ const buildBio = (home: VfsNode, warn: Warn) => {
     employment,
     resumeLinkLabel: about.headers.resumelabel || '',
     resumeLocalPath: about.headers.resumepath || '',
+    resumeUrl: resolveAssetRef(about.headers.resumepath, bioDir, { localOnly: true }),
   }
 }
 
@@ -113,12 +150,12 @@ const buildTechMonolith = (home: VfsNode) => {
       title: doc.headers.title || baseName(file.name),
       paragraphs: toParagraphs(doc.body).map((text, index) => ({ id: `${id}-${index + 1}`, text })),
       ...(doc.headers.image
-        ? { image: { url: doc.headers.image, caption: doc.headers.caption || '', variant: doc.headers.variant || 'full' } }
+        ? { image: { url: resolveAssetRef(doc.headers.image, dir), caption: doc.headers.caption || '', variant: doc.headers.variant || 'full' } }
         : {}),
     }
   })
   return {
-    logoUrl: meta.logourl || '',
+    logoUrl: resolveAssetRef(meta.logourl, dir),
     logoAlt: meta.logoalt || '',
     companyUrl: meta.companyurl || '',
     companyLabel: meta.companylabel || '',
@@ -151,7 +188,7 @@ const buildFileEntries = (dir: VfsNode): FileEntry[] => {
       })
       return
     }
-    const src = (node.content || '').trim()
+    const src = node.blobKey ? blobUrl(node) : (node.content || '').trim()
     if (IMAGE_EXTENSIONS.has(fileExtension(node.name)) && src) {
       entries.push({ id: node.id, title: node.name, type: 'photo', altText: node.name, size: nodeSize(node), src })
     }

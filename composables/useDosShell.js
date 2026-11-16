@@ -3,7 +3,12 @@ import dos from '@/content/dos.json'
 import { DOS_HISTORY_MAX } from '@/constants/ui'
 import { fillTemplate, formatDirListing, formatTree, parseCommandLine, resolveDosPath } from '@/composables/dosFormat'
 
-const errorCode = (error) => error?.data?.data?.code || error?.data?.statusMessage || ''
+const PAYLOAD_TOO_LARGE = 413
+const SUMMARY_INDENT = '        '
+const CONFIRM_ANSWERS = ['Y', 'N', 'A']
+
+const errorCode = (error) =>
+  error?.data?.data?.code || error?.data?.statusMessage || (error?.statusCode === PAYLOAD_TOO_LARGE ? 'TOO_LARGE' : '')
 
 const formatClock = (epochMs) => {
   const d = new Date(epochMs)
@@ -15,11 +20,13 @@ const formatClock = (epochMs) => {
  * commands go to `/api/fs/*`; LOGIN/LOGOUT use `/api/auth/*`. Every
  * user-visible string comes from `content/dos.json`.
  *
- * @param {{ onExit: () => void }} options Called by the EXIT command.
+ * @param {{ onExit: () => void, pickFiles: (options: { multiple: boolean, accept: string }) => Promise<File[]> }} options
+ *   `onExit` is called by EXIT; `pickFiles` opens the browser file picker
+ *   for drive A: and must call `input.click()` synchronously.
  * @returns {{
  *   lines: import('vue').Ref<Array<{ id: number, text: string, cls: string }>>,
  *   prompt: import('vue').ComputedRef<string>,
- *   mode: import('vue').Ref<'command'|'password'|'busy'>,
+ *   mode: import('vue').Ref<'command'|'password'|'confirm'|'busy'>,
  *   admin: import('vue').Ref<boolean>,
  *   expiresAt: import('vue').Ref<number|null>,
  *   init: () => Promise<void>,
@@ -32,7 +39,7 @@ const formatClock = (epochMs) => {
  *   await shell.init()
  *   await shell.submit('dir /a')
  */
-export const useDosShell = ({ onExit }) => {
+export const useDosShell = ({ onExit, pickFiles }) => {
   const lines = ref([])
   const cwd = ref(dos.homePath)
   const admin = ref(false)
@@ -41,8 +48,12 @@ export const useDosShell = ({ onExit }) => {
   const history = []
   let historyIndex = 0
   let nextLineId = 1
+  const question = ref('')
+  let answerQuestion = null
 
-  const prompt = computed(() => `${admin.value ? dos.adminPromptPrefix : ''}${cwd.value}>`)
+  const prompt = computed(() =>
+    mode.value === 'confirm' ? question.value : `${admin.value ? dos.adminPromptPrefix : ''}${cwd.value}>`,
+  )
 
   const print = (text = '', cls = '') => {
     String(text)
@@ -70,13 +81,124 @@ export const useDosShell = ({ onExit }) => {
     return true
   }
 
+  const ask = (text) =>
+    new Promise((resolve) => {
+      question.value = text
+      answerQuestion = resolve
+      mode.value = 'confirm'
+    })
+
+  const printWarnings = (result) => {
+    ;(result?.warnings || []).forEach((text) => print(message('contentWarning', { text }), 'warn'))
+  }
+
+  const requireAdminSession = () => {
+    if (admin.value) return true
+    printError(message('adminRequired'))
+    return false
+  }
+
+  /**
+   * Drops admin mode locally when the session expires (timer or a 401
+   * from a write).
+   *
+   * @returns {void}
+   */
+  const expireSession = () => {
+    if (!admin.value) return
+    admin.value = false
+    expiresAt.value = null
+    print(message('sessionExpired'), 'warn')
+  }
+
   const reportFsError = (error, name) => {
     const code = errorCode(error)
     if (code === 'NOT_FOUND') printError(message('fileNotFound', { name }))
     else if (code === 'NOT_A_DIR') printError(message('invalidDirectory'))
-    else if (code === 'IS_A_DIR') printError(message('accessDenied'))
-    else if (code === 'INVALID_PATH') printError(message('invalidPath'))
+    else if (['IS_A_DIR', 'READ_ONLY', 'PROTECTED'].includes(code)) printError(message('accessDenied'))
+    else if (code === 'INVALID_PATH' || code === 'INVALID_NAME') printError(message('invalidPath'))
+    else if (code === 'TOO_LARGE') printError(message('fileTooLarge', { name }))
+    else if (code === 'UNSUPPORTED_TYPE') printError(message('unsupportedType', { name }))
+    else if (code === 'INVALID_MOVE') printError(message('copyOntoItself'))
+    else if (code === 'UNAUTHORIZED') expireSession()
     else printError(message('generalFailure'))
+  }
+
+  const post = async (url, body) => {
+    try {
+      return { data: await $fetch(url, { method: 'POST', body }) }
+    } catch (error) {
+      return { error, code: errorCode(error) }
+    }
+  }
+
+  const uploadFile = (file, path, overwrite) => {
+    const form = new FormData()
+    form.append('path', path)
+    form.append('overwrite', overwrite ? '1' : '0')
+    form.append('file', file, file.name)
+    return post('/api/fs/upload', form)
+  }
+
+  const withOverwritePrompt = async (name, run, state) => {
+    const first = await run(state.all)
+    if (first.code !== 'EXISTS') return first
+    const target = first.error?.data?.data?.path || name
+    const answer = await ask(message('overwritePrompt', { name: target }))
+    if (answer === 'A') state.all = true
+    if (answer === 'N') return { skipped: true }
+    return run(true)
+  }
+
+  const copyFromFloppy = async (source, destination, overwriteAll) => {
+    const pattern = source.slice(2).replace(/^[\\/]/, '')
+    const extension = pattern.match(/\.([a-z0-9]+)$/i)?.[1]
+    const accept = extension && !/[*?]/.test(extension) ? `.${extension.toLowerCase()}` : dos.floppyAccept
+    const destPath = resolveArg(destination || '.')
+    if (!destPath) return
+
+    print(message('insertDiskette'))
+    const files = await pickFiles({ multiple: !pattern || /[*?]/.test(pattern), accept })
+    if (!files.length) {
+      printError(message('driveNotReady', { drive: 'A' }))
+      return
+    }
+
+    const state = { all: overwriteAll }
+    let copied = 0
+    for (const file of files) {
+      print(`A:\\${file.name}`)
+      const result = await withOverwritePrompt(file.name, (overwrite) => uploadFile(file, destPath, overwrite), state)
+      if (result.skipped) continue
+      if (result.error) {
+        reportFsError(result.error, file.name)
+        if (result.code === 'UNAUTHORIZED') break
+        continue
+      }
+      copied++
+      printWarnings(result.data)
+    }
+    print(`${SUMMARY_INDENT}${message('filesCopied', { count: copied })}`)
+    if (copied) print(message('refreshHint'), 'dim')
+  }
+
+  const copyWithinDrive = async (source, destination, overwriteAll) => {
+    const from = resolveArg(source)
+    if (!from) return
+    const to = resolveArg(destination || '.')
+    if (!to) return
+    const name = from.split('\\').pop()
+    const result = await withOverwritePrompt(name, (overwrite) => post('/api/fs/copy', { from, to, overwrite }), {
+      all: overwriteAll,
+    })
+    if (result.error) {
+      reportFsError(result.error, source)
+      print(`${SUMMARY_INDENT}${message('filesCopied', { count: 0 })}`)
+      return
+    }
+    if (!result.skipped) printWarnings(result.data)
+    print(`${SUMMARY_INDENT}${message('filesCopied', { count: result.skipped ? 0 : 1 })}`)
+    if (!result.skipped) print(message('refreshHint'), 'dim')
   }
 
   const commands = {
@@ -97,6 +219,20 @@ export const useDosShell = ({ onExit }) => {
 
     CLS() {
       lines.value = []
+    },
+
+    COPY({ args, switches }) {
+      if (!assertSwitches(switches, ['Y'])) return
+      if (!args.length) {
+        printError(message('requiredParameter'))
+        return
+      }
+      if (!requireAdminSession()) return
+      const overwriteAll = switches.includes('Y')
+      // Must stay synchronous up to pickFiles(): the browser only opens the
+      // file picker inside the keydown that submitted the command.
+      if (/^a:/i.test(args[0])) return copyFromFloppy(args[0], args[1], overwriteAll)
+      return copyWithinDrive(args[0], args[1], overwriteAll)
     },
 
     async DIR({ args, switches }) {
@@ -175,7 +311,8 @@ export const useDosShell = ({ onExit }) => {
       if (!path) return
       try {
         const file = await $fetch('/api/fs/read', { query: { path } })
-        print(file.content)
+        if (file.binary) print(message('binaryFile', { name: file.name, size: file.size.toLocaleString('en-US') }))
+        else print(file.content)
       } catch (error) {
         reportFsError(error, args[0])
       }
@@ -212,6 +349,17 @@ export const useDosShell = ({ onExit }) => {
    */
   const submit = async (input) => {
     if (mode.value === 'busy') return
+
+    if (mode.value === 'confirm') {
+      print(`${question.value}${input}`)
+      const answer = input.trim().charAt(0).toUpperCase()
+      if (!CONFIRM_ANSWERS.includes(answer)) return
+      mode.value = 'busy'
+      const resolve = answerQuestion
+      answerQuestion = null
+      resolve(answer)
+      return
+    }
 
     if (mode.value === 'password') {
       print(`${dos.messages.passwordPrompt}${'*'.repeat(input.length)}`)
@@ -258,19 +406,6 @@ export const useDosShell = ({ onExit }) => {
     if (!history.length || mode.value !== 'command') return null
     historyIndex = Math.min(history.length, Math.max(0, historyIndex + direction))
     return history[historyIndex] ?? ''
-  }
-
-  /**
-   * Drops admin mode locally when the session's expiry time passes.
-   *
-   * @returns {void}
-   */
-  const expireSession = () => {
-    if (!admin.value) return
-    admin.value = false
-    expiresAt.value = null
-    print(message('sessionExpired'), 'warn')
-    print('')
   }
 
   /**

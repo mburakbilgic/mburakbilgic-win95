@@ -16,9 +16,10 @@ export default defineFsWriteHandler(({ body }) => {
     if (existing.type === 'dir') throw new VfsError('IS_A_DIR', `${name} is a directory`)
     if (mode === 'create') throw new VfsError('EXISTS', `${name} already exists`)
     assertWritable(existing)
+    if (mode === 'append' && existing.blobKey) throw new VfsError('UNSUPPORTED_TYPE', `${name} is a binary file`)
     const next = mode === 'append' ? `${existing.content || ''}${content}` : content
     assertContentSize(next)
-    file = updateNode(existing.id, { content: next, size: null })
+    file = updateNode(existing.id, { content: next, size: null, blobKey: null, mime: null })
   }
 
   const canonical = vfsNodePath(file)

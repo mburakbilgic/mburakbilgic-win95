@@ -47,6 +47,9 @@ export const useDb = (): Database.Database => {
   connection.pragma('journal_mode = WAL')
   connection.pragma('foreign_keys = ON')
   connection.exec(SCHEMA)
+  const columns = (connection.prepare('PRAGMA table_info(nodes)').all() as Array<{ name: string }>).map((c) => c.name)
+  if (!columns.includes('blob_key')) connection.exec('ALTER TABLE nodes ADD COLUMN blob_key TEXT')
+  if (!columns.includes('mime')) connection.exec('ALTER TABLE nodes ADD COLUMN mime TEXT')
   const root = connection.prepare('SELECT id FROM nodes WHERE parent_id IS NULL').get()
   if (!root) {
     connection.prepare("INSERT INTO nodes (parent_id, name, type) VALUES (NULL, 'C:', 'dir')").run()

@@ -56,7 +56,7 @@ const aboutIntro = (bio.aboutIntroTemplate || '').replace('{age}', String(curren
       <h3 class="pb-1"><b>Résumé</b></h3>
       <a
         style="color: #ff5733"
-        :href="bio.resumeLocalPath"
+        :href="bio.resumeUrl || bio.resumeLocalPath"
         class="font-thin text-sm pb-2.5"
       >{{ bio.resumeLinkLabel }}</a>
     </div>

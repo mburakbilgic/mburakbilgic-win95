@@ -31,7 +31,17 @@
     "alreadyLoggedIn": "Already logged in. Session expires at {time}.",
     "notLoggedIn": "Not logged in.",
     "loggedOut": "Logged out.",
-    "sessionExpired": "Session expired. Type LOGIN to sign in again."
+    "sessionExpired": "Session expired. Type LOGIN to sign in again.",
+    "adminRequired": "Access denied. Type LOGIN to sign in as administrator.",
+    "insertDiskette": "Insert diskette for drive A: and select the file(s)...",
+    "filesCopied": "{count} file(s) copied",
+    "overwritePrompt": "Overwrite {name} (Yes/No/All)?",
+    "fileTooLarge": "File too large - {name}",
+    "unsupportedType": "Unsupported file type - {name}",
+    "copyOntoItself": "File cannot be copied onto itself",
+    "binaryFile": "{name} is a binary file ({size} bytes). Open it from the desktop to view it.",
+    "contentWarning": "Warning: {text}",
+    "refreshHint": "Press F5 to refresh the desktop and see the change."
   },
   "dir": {
     "volume": " Volume in drive C is {label}",
@@ -48,15 +58,50 @@
     "noSubfolders": "No subfolders exist"
   },
   "help": [
-    { "command": "CD", "text": "Displays the name of or changes the current directory." },
-    { "command": "CLS", "text": "Clears the screen." },
-    { "command": "DIR", "text": "Displays a list of files and subdirectories. DIR [path] [/A]" },
-    { "command": "EXIT", "text": "Quits the MS-DOS Prompt." },
-    { "command": "HELP", "text": "Provides help information for commands." },
-    { "command": "LOGIN", "text": "Signs in as administrator." },
-    { "command": "LOGOUT", "text": "Signs out of the administrator session." },
-    { "command": "TREE", "text": "Graphically displays the folder structure. TREE [path] [/F]" },
-    { "command": "TYPE", "text": "Displays the contents of a text file." },
-    { "command": "VER", "text": "Displays the Windows version." }
-  ]
+    {
+      "command": "CD",
+      "text": "Displays the name of or changes the current directory."
+    },
+    {
+      "command": "CLS",
+      "text": "Clears the screen."
+    },
+    {
+      "command": "COPY",
+      "text": "Copies files. COPY A:\\*.* [destination] uploads from your computer."
+    },
+    {
+      "command": "DIR",
+      "text": "Displays a list of files and subdirectories. DIR [path] [/A]"
+    },
+    {
+      "command": "EXIT",
+      "text": "Quits the MS-DOS Prompt."
+    },
+    {
+      "command": "HELP",
+      "text": "Provides help information for commands."
+    },
+    {
+      "command": "LOGIN",
+      "text": "Signs in as administrator."
+    },
+    {
+      "command": "LOGOUT",
+      "text": "Signs out of the administrator session."
+    },
+    {
+      "command": "TREE",
+      "text": "Graphically displays the folder structure. TREE [path] [/F]"
+    },
+    {
+      "command": "TYPE",
+      "text": "Displays the contents of a text file."
+    },
+    {
+      "command": "VER",
+      "text": "Displays the Windows version."
+    }
+  ],
+  "floppyAccept": "image/jpeg,image/png,image/gif,image/webp,application/pdf"
 }

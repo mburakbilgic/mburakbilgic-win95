@@ -12,6 +12,8 @@ export interface VfsNode {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  blobKey: string | null
+  mime: string | null
 }
 
 export type VfsErrorCode =
@@ -26,9 +28,14 @@ export type VfsErrorCode =
   | 'PROTECTED'
   | 'TOO_LARGE'
   | 'INVALID_MOVE'
+  | 'UNSUPPORTED_TYPE'
 
 export class VfsError extends Error {
-  constructor(public code: VfsErrorCode, message: string) {
+  constructor(
+    public code: VfsErrorCode,
+    message: string,
+    public path?: string,
+  ) {
     super(message)
     this.name = 'VfsError'
   }
@@ -50,6 +57,8 @@ interface NodeRow {
   sort_order: number
   created_at: string
   updated_at: string
+  blob_key: string | null
+  mime: string | null
 }
 
 const toNode = (row: NodeRow): VfsNode => ({
@@ -64,6 +73,8 @@ const toNode = (row: NodeRow): VfsNode => ({
   sortOrder: row.sort_order,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  blobKey: row.blob_key,
+  mime: row.mime,
 })
 
 /**
@@ -193,8 +204,9 @@ export const throwVfsHttpError = (error: unknown): never => {
     READ_ONLY: 403,
     PROTECTED: 403,
     TOO_LARGE: 413,
+    UNSUPPORTED_TYPE: 415,
   }[error.code]
-  throw createError({ statusCode, statusMessage: error.code, data: { code: error.code } })
+  throw createError({ statusCode, statusMessage: error.code, data: { code: error.code, path: error.path } })
 }
 
 /**
@@ -220,7 +232,7 @@ export const listChildren = (parentId: number, options: { includeHidden?: boolea
  * Creates a node under a directory.
  *
  * @param {number} parentId
- * @param {{ name: string, type: VfsNodeType, content?: string|null, size?: number|null, hidden?: boolean, readonly?: boolean, sortOrder?: number }} input
+ * @param {{ name: string, type: VfsNodeType, content?: string|null, size?: number|null, hidden?: boolean, readonly?: boolean, sortOrder?: number, blobKey?: string|null, mime?: string|null }} input
  * @returns {VfsNode}
  * @throws {VfsError} INVALID_NAME, NOT_A_DIR or EXISTS.
  * @example
@@ -236,6 +248,8 @@ export const createNode = (
     hidden?: boolean
     readonly?: boolean
     sortOrder?: number
+    blobKey?: string | null
+    mime?: string | null
   },
 ): VfsNode => {
   assertValidName(input.name)
@@ -246,8 +260,8 @@ export const createNode = (
 
   const result = useDb()
     .prepare(
-      `INSERT INTO nodes (parent_id, name, type, content, size, hidden, readonly, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO nodes (parent_id, name, type, content, size, hidden, readonly, sort_order, blob_key, mime)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       parentId,
@@ -258,6 +272,8 @@ export const createNode = (
       input.hidden ? 1 : 0,
       input.readonly ? 1 : 0,
       input.sortOrder ?? 0,
+      input.type === 'file' ? (input.blobKey ?? null) : null,
+      input.type === 'file' ? (input.mime ?? null) : null,
     )
   return toNode(useDb().prepare('SELECT * FROM nodes WHERE id = ?').get(result.lastInsertRowid) as NodeRow)
 }
@@ -341,7 +357,7 @@ export const resolveParent = (path: string): { parent: VfsNode; name: string } =
  * Applies a partial update to a node and bumps `updated_at`.
  *
  * @param {number} id
- * @param {{ name?: string, parentId?: number, content?: string, size?: number|null, hidden?: boolean, readonly?: boolean }} patch
+ * @param {{ name?: string, parentId?: number, content?: string, size?: number|null, hidden?: boolean, readonly?: boolean, blobKey?: string|null, mime?: string|null }} patch
  * @returns {VfsNode}
  * @throws {VfsError} INVALID_NAME when a new name is invalid.
  * @example
@@ -349,7 +365,16 @@ export const resolveParent = (path: string): { parent: VfsNode; name: string } =
  */
 export const updateNode = (
   id: number,
-  patch: { name?: string; parentId?: number; content?: string; size?: number | null; hidden?: boolean; readonly?: boolean },
+  patch: {
+    name?: string
+    parentId?: number
+    content?: string
+    size?: number | null
+    hidden?: boolean
+    readonly?: boolean
+    blobKey?: string | null
+    mime?: string | null
+  },
 ): VfsNode => {
   if (patch.name !== undefined) assertValidName(patch.name)
   const columns: Record<string, string> = {
@@ -359,6 +384,8 @@ export const updateNode = (
     size: 'size',
     hidden: 'hidden',
     readonly: 'readonly',
+    blobKey: 'blob_key',
+    mime: 'mime',
   }
   const sets: string[] = []
   const values: unknown[] = []
@@ -417,4 +444,18 @@ export const assertContentSize = (content: string): void => {
   if (Buffer.byteLength(content, 'utf8') > VFS_FILE_MAX_BYTES) {
     throw new VfsError('TOO_LARGE', `File exceeds ${VFS_FILE_MAX_BYTES} bytes`)
   }
+}
+
+/**
+ * Canonical path of a (possibly not yet existing) child of a directory.
+ *
+ * @param {VfsNode} parent
+ * @param {string} name
+ * @returns {string}
+ * @example
+ *   childPath(desktop, 'todo.TXT') // → 'C:\MBURAKBILGIC\DESKTOP\todo.TXT'
+ */
+export const childPath = (parent: VfsNode, name: string): string => {
+  const base = vfsNodePath(parent)
+  return base.endsWith('\\') ? `${base}${name}` : `${base}\\${name}`
 }
