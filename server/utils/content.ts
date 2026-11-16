@@ -166,40 +166,76 @@ const buildTechMonolith = (home: VfsNode) => {
 interface FileEntry {
   id: number
   title: string
-  type: 'folder' | 'photo'
+  type: 'folder' | 'photo' | 'file'
   altText: string
   size: number
+  path: string
   src?: string
+  fileType?: 'text' | 'pdf'
   content?: FileEntry[]
 }
 
-const buildFileEntries = (dir: VfsNode): FileEntry[] => {
+const toFileEntry = (node: VfsNode, path: string, allFiles: boolean): FileEntry | null => {
+  const base = { id: node.id, title: node.name, altText: node.name, size: nodeSize(node), path }
+  const src = node.blobKey ? blobUrl(node) : (node.content || '').trim()
+  const isImage = node.blobKey ? node.mime?.startsWith('image/') : IMAGE_EXTENSIONS.has(fileExtension(node.name))
+  if (isImage && src) return { ...base, type: 'photo', src }
+  if (!allFiles) return null
+  if (node.mime === 'application/pdf') return { ...base, type: 'file', fileType: 'pdf', src: blobUrl(node) }
+  return node.blobKey ? null : { ...base, type: 'file', fileType: 'text' }
+}
+
+/**
+ * Converts a directory into the tree the Win95 folder window renders.
+ * Photos only lists images; the desktop also lists text files and PDFs.
+ */
+const buildFileEntries = (
+  dir: VfsNode,
+  dirPath: string,
+  options: { allFiles?: boolean; skip?: (node: VfsNode) => boolean } = {},
+): FileEntry[] => {
   const entries: FileEntry[] = []
   listChildren(dir.id).forEach((node) => {
+    if (options.skip?.(node)) return
+    const path = `${dirPath}\\${node.name}`
     if (node.type === 'dir') {
-      const content = buildFileEntries(node)
+      const content = buildFileEntries(node, path, { allFiles: options.allFiles })
       entries.push({
         id: node.id,
         title: node.name,
         type: 'folder',
         altText: node.name,
         size: content.reduce((sum, e) => sum + e.size, 0),
+        path,
         content,
       })
       return
     }
-    const src = node.blobKey ? blobUrl(node) : (node.content || '').trim()
-    if (IMAGE_EXTENSIONS.has(fileExtension(node.name)) && src) {
-      entries.push({ id: node.id, title: node.name, type: 'photo', altText: node.name, size: nodeSize(node), src })
-    }
+    const entry = toFileEntry(node, path, Boolean(options.allFiles))
+    if (entry) entries.push(entry)
   })
   return entries
 }
 
 const buildPhotos = (home: VfsNode) => {
   const dir = childOf(home, CONTENT_DIRS.photos)
-  const folders = dir ? buildFileEntries(dir) : []
+  const folders = dir ? buildFileEntries(dir, `${CONTENT_HOME_PATH}\\${dir.name}`) : []
   return { folderSize: folders.reduce((sum, e) => sum + e.size, 0), folders }
+}
+
+const DESKTOP_KIND_ORDER = { folder: 0, file: 1, photo: 1 } as const
+
+const buildDesktopEntries = (home: VfsNode): FileEntry[] => {
+  const dir = childOf(home, CONTENT_DIRS.desktop)
+  if (!dir) return []
+  return buildFileEntries(dir, `${CONTENT_HOME_PATH}\\${dir.name}`, {
+    allFiles: true,
+    skip: (node) => node.type === 'file' && fileExtension(node.name) === 'LNK',
+  }).sort(
+    (a, b) =>
+      DESKTOP_KIND_ORDER[a.type] - DESKTOP_KIND_ORDER[b.type] ||
+      a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }),
+  )
 }
 
 const buildSocial = (home: VfsNode, warn: Warn) =>
@@ -256,7 +292,9 @@ export type SiteContent = ReturnType<typeof buildSiteContent>
  * @param {{ onWarning?: (path: string, message: string) => void }} [options]
  *   Receives skipped-file warnings (path relative to C:\MBURAKBILGIC);
  *   defaults to logging them.
- * @returns {{ site: object, bio: object, projects: object[], techMonolith: object, photos: object, social: object[], desktop: object[] }}
+ * @returns {{ site: object, bio: object, projects: object[], techMonolith: object, photos: object, social: object[], desktop: object[], desktopEntries: object[] }}
+ *   `desktop` holds the `.LNK` shortcuts; `desktopEntries` the other
+ *   folders and files under DESKTOP, in the folder-window tree shape.
  * @throws {Error} When the content tree has not been seeded.
  * @example
  *   const { bio, projects } = buildSiteContent()
@@ -274,6 +312,7 @@ export const buildSiteContent = (options: { onWarning?: Warn } = {}) => {
     photos: buildPhotos(home),
     social: buildSocial(home, warn),
     desktop: buildDesktop(home, warn),
+    desktopEntries: buildDesktopEntries(home),
   }
 }
 

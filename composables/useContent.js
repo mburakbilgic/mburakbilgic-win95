@@ -20,6 +20,7 @@ import { useContentStore } from '@/stores/content'
  *   projects: object[],
  *   photos: { folderSize: number, folders: Array<object> },
  *   desktop: object[],
+ *   desktopEntries: object[],
  *   windows: typeof windows,
  *   mail: typeof mail,
  * }}
@@ -36,6 +37,7 @@ export const useContent = () => {
     projects: store.projects,
     photos: store.photos,
     desktop: store.desktop,
+    desktopEntries: store.desktopEntries,
     windows,
     mail,
   }
