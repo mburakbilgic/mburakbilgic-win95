@@ -166,7 +166,8 @@ export const useDosShell = ({ onExit, pickFiles }) => {
 
   /**
    * Sends one admin write request and prints its outcome the DOS way:
-   * nothing on success except content warnings and the F5 hint.
+   * nothing on success except content warnings, plus the F5 hint when the
+   * server reports that the site content changed.
    *
    * @param {string} url
    * @param {object} body
@@ -183,7 +184,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       return null
     }
     printWarnings(result.data)
-    print(message('refreshHint'), 'dim')
+    if (result.data?.siteChanged) print(message('refreshHint'), 'dim')
     return result.data
   }
 
@@ -238,6 +239,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
 
     const state = { all: overwriteAll }
     let copied = 0
+    let siteChanged = false
     for (const file of files) {
       print(`A:\\${file.name}`)
       const result = await withOverwritePrompt(file.name, (overwrite) => uploadFile(file, destPath, overwrite), state)
@@ -248,10 +250,11 @@ export const useDosShell = ({ onExit, pickFiles }) => {
         continue
       }
       copied++
+      siteChanged ||= Boolean(result.data?.siteChanged)
       printWarnings(result.data)
     }
     print(`${SUMMARY_INDENT}${message('filesCopied', { count: copied })}`)
-    if (copied) print(message('refreshHint'), 'dim')
+    if (siteChanged) print(message('refreshHint'), 'dim')
   }
 
   const copyWithinDrive = async (source, destination, overwriteAll) => {
@@ -270,7 +273,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     }
     if (!result.skipped) printWarnings(result.data)
     print(`${SUMMARY_INDENT}${message('filesCopied', { count: result.skipped ? 0 : 1 })}`)
-    if (!result.skipped) print(message('refreshHint'), 'dim')
+    if (result.data?.siteChanged) print(message('refreshHint'), 'dim')
   }
 
   const commands = {

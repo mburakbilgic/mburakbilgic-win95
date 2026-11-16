@@ -277,6 +277,31 @@ export const buildSiteContent = (options: { onWarning?: Warn } = {}) => {
   }
 }
 
+const siteContentSnapshot = (): string => {
+  try {
+    return JSON.stringify(buildSiteContent({ onWarning: () => {} }))
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Runs a VFS write and reports whether it changed what `GET /api/content`
+ * returns, i.e. whether a page refresh will show it. Comparing the built
+ * content (instead of matching paths) stays correct for every file format,
+ * the hidden attribute and asset references resolved from other folders.
+ *
+ * @param {() => T} write Must run inside the caller's transaction.
+ * @returns {T & { siteChanged: boolean }}
+ * @example
+ *   return useDb().transaction(() => trackSiteChange(() => handler({ event, body })))()
+ */
+export const trackSiteChange = <T extends object>(write: () => T): T & { siteChanged: boolean } => {
+  const before = siteContentSnapshot()
+  const result = write()
+  return { ...result, siteChanged: siteContentSnapshot() !== before }
+}
+
 const PROTECTED_PATHS = new Set(
   [
     `${VFS_DRIVE}\\`,

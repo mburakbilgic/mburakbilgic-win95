@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     if (!destination) throw new VfsError('INVALID_PATH', 'Missing path')
     const overwrite = field('overwrite') === '1'
 
-    return useDb().transaction(() => {
+    return useDb().transaction(() => trackSiteChange(() => {
       const { parent, name } = resolveDestination(destination, file.filename as string)
       assertValidName(name)
       const blobKey = storeBlob(file.data)
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
       }
       const path = vfsNodePath(node)
       return { path, size: file.data.length, mime, created: !existing, warnings: collectContentWarnings([path]) }
-    })()
+    }))()
   } catch (error) {
     return throwVfsHttpError(error)
   }

@@ -41,7 +41,7 @@
     "copyOntoItself": "File cannot be copied onto itself",
     "binaryFile": "{name} is a binary file ({size} bytes). Open it from the desktop to view it.",
     "contentWarning": "Warning: {text}",
-    "refreshHint": "Press F5 to refresh the desktop and see the change.",
+    "refreshHint": "This change is visible on the site. Press F5 to refresh the page.",
     "unableToCreateDir": "Unable to create directory",
     "rdFailed": "Invalid path, not directory,\nor directory not empty",
     "removeCurrentDir": "Attempt to remove current directory - {name}",

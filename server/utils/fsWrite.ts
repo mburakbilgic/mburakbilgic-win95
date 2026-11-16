@@ -5,7 +5,8 @@ type FsWriteBody = Record<string, unknown>
 /**
  * Wraps an admin-only file-system write endpoint: checks the session and
  * Origin, parses the JSON body, runs the handler inside one SQLite
- * transaction and converts VfsErrors into HTTP errors.
+ * transaction, adds `siteChanged` to the response and converts VfsErrors
+ * into HTTP errors.
  *
  * @param {(ctx: { event: H3Event, body: FsWriteBody }) => object} handler
  * @returns {ReturnType<typeof defineEventHandler>}
@@ -20,7 +21,7 @@ export const defineFsWriteHandler = (handler: (ctx: { event: H3Event; body: FsWr
     const raw = await readBody(event).catch(() => null)
     const body: FsWriteBody = raw && typeof raw === 'object' ? (raw as FsWriteBody) : {}
     try {
-      return useDb().transaction(() => handler({ event, body }))()
+      return useDb().transaction(() => trackSiteChange(() => handler({ event, body })))()
     } catch (error) {
       return throwVfsHttpError(error)
     }
