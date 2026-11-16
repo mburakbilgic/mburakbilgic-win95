@@ -12,6 +12,7 @@ import StartMenu from './templates/StartMenu.vue'
 import Projects from './views/Projects.vue'
 import DosReadme from './views/DosReadme.vue'
 import DosPrompt from './views/DosPrompt.vue'
+import Notepad from './views/Notepad.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
@@ -44,6 +45,7 @@ const slotViews = [
   { name: 'projects', comp: Projects },
   { name: 'dosReadme', comp: DosReadme },
   { name: 'dosPrompt', comp: DosPrompt },
+  { name: 'notepad', comp: Notepad },
 ]
 
 const windowCheck = (windowId) => {

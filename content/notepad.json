@@ -1,0 +1,6 @@
+{
+  "titleSuffix": " - Notepad",
+  "menu": ["File", "Edit", "Search", "Help"],
+  "loading": "Loading...",
+  "notFound": "Cannot find the {name} file.\n\nThe file may have been moved, renamed or deleted."
+}

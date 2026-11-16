@@ -28,3 +28,23 @@ export const DOS_HISTORY_MAX = 50
  * End-of-file marker (Ctrl+Z / F6) that ends COPY CON input; shown as ^Z.
  */
 export const DOS_EOF_CHAR = '\u001a'
+
+/**
+ * Window id prefixes for windows opened from VFS entries; the node id
+ * follows, so opening the same folder or file again reuses its window.
+ */
+export const FOLDER_WINDOW_PREFIX = 'Folder-'
+export const NOTEPAD_WINDOW_PREFIX = 'Notepad-'
+
+/**
+ * Upper bounds for the random opening offset of folder and Notepad
+ * windows, so several windows do not stack exactly on top of each other.
+ */
+export const OPENED_WINDOW_MAX_OFFSET_VW = 10
+export const OPENED_WINDOW_MAX_OFFSET_VH = 25
+
+/**
+ * provide/inject key through which Window.vue tells its content view
+ * which window record it renders.
+ */
+export const WINDOW_ID_KEY = 'windowId'

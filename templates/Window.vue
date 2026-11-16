@@ -3,6 +3,7 @@ import interact from 'interactjs';
 import {
     onMounted,
     onBeforeUnmount,
+    provide,
     ref,
     computed
 } from 'vue';
@@ -10,7 +11,7 @@ import {
     useWindowsStore
 } from '@/stores/windows'
 import { useImagePath } from '@/composables/useImagePath'
-import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
+import { SCREEN_FALLBACK_SIZE_PX, WINDOW_ID_KEY, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
 
 const props = withDefaults(
     defineProps<{
@@ -41,6 +42,7 @@ const windowsStore = useWindowsStore()
 const { iconPath } = useImagePath()
 const window = ref({})
 const ComponentName = props.nameOfWindow
+provide(WINDOW_ID_KEY, props.nameOfWindow)
 const w = ref(400)
 const h = ref(400)
 

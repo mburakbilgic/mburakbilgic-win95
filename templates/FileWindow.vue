@@ -4,12 +4,14 @@ import {
     onMounted,
     onBeforeUnmount,
     ref,
-    computed
+    computed,
+    watch
 } from 'vue';
 import {
     useWindowsStore
 } from '@/stores/windows'
 import { SCREEN_FALLBACK_SIZE_PX, WINDOW_MIN_SIZE_PX } from '@/constants/ui'
+import { useFileOpen } from '@/composables/useFileOpen'
 
 const props = withDefaults(
     defineProps<{
@@ -47,8 +49,11 @@ const w = ref(0)
 const h = ref(0)
 const gridHeight = ref("")
 const fileExplorer = ref(null)
-const files = ref(props.folderContent)
+const files = computed(() => props.folderContent)
 const size = ref(props.folderSize)
+watch(() => props.folderSize, (next) => {
+    size.value = next
+})
 
 onMounted(() => {
     if (fileExplorer.value) {
@@ -126,59 +131,9 @@ const setSize = (file) => {
     size.value = file.size
 }
 
-const getRndInteger = (min, max) => {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+const { openEntry } = useFileOpen()
 
-const openWindow = (file) => {
-   if (file.type == 'folder') {
-        const windowId = "FolderWindow" + getRndInteger(1, 1000000)
-        const addWindowPayload = {
-            windowId: windowId,
-            windowState: "close",
-            displayName: file.title,
-            windowComponent: "FilesWindow",
-            windowContent: "",
-            windowContentPadding: {
-                top: "0px",
-                right: "0px",
-                bottom: "0px",
-                left: "0px",
-            },
-            position: "absolute",
-            positionX: getRndInteger(1, 10) + "vw",
-            positionY: getRndInteger(1, 25) + "vh",
-            iconImage: "folder.png",
-            altText: file.title,
-            fullscreen: false,
-            showInAppGrid: false,
-            showInNavbar: true,
-            folderContent: file.content,
-            folderSize: file.size,
-        }
-        const openWindowPayload = {
-            windowState: "open",
-            windowId: windowId
-        }
-        windowsStore.pushNewWindow(addWindowPayload)
-        windowsStore.setWindowState(openWindowPayload)
-    } else if (file.type == "video") {
-        return
-    } else {
-        const openWindowPayload = {
-            windowState: "open",
-            windowId: "ImagePreviewWindow"
-        }
-        const contentPayload = files.value.slice(files.value.indexOf(file));
-        contentPayload.push(...files.value.slice(0, files.value.indexOf(file)));
-        windowsStore.setWindowState({
-            windowState: "close",
-            windowId: "ImagePreviewWindow",
-        })
-        windowsStore.setPhotoFolderContent(contentPayload)
-        windowsStore.setWindowState(openWindowPayload)
-    }
-}
+const openWindow = (file) => openEntry(file, files.value)
 
 let isDragging = false;
 let draggableWindow = null;

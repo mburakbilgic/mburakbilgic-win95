@@ -3,12 +3,18 @@ import { computed, onMounted, ref } from 'vue'
 import { useWindowsStore } from '@/stores/windows'
 import { useImagePath } from '@/composables/useImagePath'
 import { useContent } from '@/composables/useContent'
+import { useFileOpen } from '@/composables/useFileOpen'
+import folderIcon from '@/assets/FileWindow/folder.png'
+import fileIcon from '@/assets/FileWindow/file.png'
+import imageIcon from '@/assets/FileWindow/image.png'
 
 const NAVBAR_OFFSET_PX = 60
+const ENTRY_ICONS = { folder: folderIcon, photo: imageIcon, file: fileIcon }
 
 const windowsStore = useWindowsStore()
 const { iconPath } = useImagePath()
-const { desktop } = useContent()
+const { desktop, desktopEntries } = useContent()
+const { openEntry } = useFileOpen()
 
 const shortcuts = computed(() =>
     desktop.filter((shortcut) => windowsStore.getWindowById(shortcut.target))
@@ -39,6 +45,20 @@ onMounted(() => {
         <div class="border-box">
           <p class="icon-text">
             {{ shortcut.name }}
+          </p>
+        </div>
+      </button>
+    </li>
+    <li v-for="entry in desktopEntries" :key="entry.id">
+      <button
+        class="icon"
+        @touchstart="openEntry(entry, desktopEntries)"
+        @dblclick="openEntry(entry, desktopEntries)"
+      >
+        <img class="icon-image" :src="ENTRY_ICONS[entry.type]" :alt="entry.title" />
+        <div class="border-box">
+          <p class="icon-text">
+            {{ entry.title }}
           </p>
         </div>
       </button>
