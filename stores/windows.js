@@ -1,7 +1,23 @@
 import { defineStore } from "pinia";
 import { nextTick } from "vue";
 import windowsConfig from "@/content/windows.json";
+import notepad from "@/content/notepad.json";
 import { useContentStore } from "@/stores/content";
+import { FOLDER_WINDOW_PREFIX, NOTEPAD_WINDOW_PREFIX } from "@/constants/ui";
+
+const findEntry = (entries, id) => {
+  for (const entry of entries) {
+    if (entry.id === id) return entry;
+    const nested = entry.content ? findEntry(entry.content, id) : null;
+    if (nested) return nested;
+  }
+  return null;
+};
+
+const openedEntryId = (windowId) => {
+  const prefix = [FOLDER_WINDOW_PREFIX, NOTEPAD_WINDOW_PREFIX].find((p) => windowId.startsWith(p));
+  return prefix ? Number(windowId.slice(prefix.length)) : null;
+};
 
 /**
  * Builds the window records from the bundled registry, applying the
@@ -140,6 +156,62 @@ export const useWindowsStore = defineStore("windows", {
      */
     pushNewWindow(window) {
       this.windows.push(window);
+    },
+
+    /**
+     * Applies freshly loaded content to the existing window records
+     * without touching their open/closed state: shortcut name and icon
+     * overrides, the Photos tree, and the folder and Notepad windows
+     * opened from VFS entries. A window whose entry no longer exists
+     * (deleted, hidden) is closed. Open windows keep their position.
+     *
+     * @param {{ desktop: object[], desktopEntries: object[], photos: { folders: object[], folderSize: number } }} content
+     * @returns {void}
+     * @example
+     *   windowsStore.rehydrate(useContentStore())
+     */
+    rehydrate(content) {
+      hydrateWindows(windowsConfig, content).forEach((fresh) => {
+        const record = this.getWindowById(fresh.windowId);
+        if (!record) return;
+        Object.assign(record, {
+          displayName: fresh.displayName,
+          altText: fresh.altText,
+          iconImage: fresh.iconImage,
+        });
+        if (record.windowState === "close") {
+          Object.assign(record, { positionX: fresh.positionX, positionY: fresh.positionY });
+        }
+        if (fresh.folderContent) {
+          Object.assign(record, { folderContent: fresh.folderContent, folderSize: fresh.folderSize });
+        }
+      });
+
+      const entries = [...content.desktopEntries, ...content.photos.folders];
+      this.windows.forEach((record) => {
+        const id = openedEntryId(record.windowId);
+        if (id === null) return;
+        const entry = findEntry(entries, id);
+        if (!entry) {
+          if (record.windowState !== "close") this.setWindowState({ windowState: "close", windowId: record.windowId });
+          return;
+        }
+        if (record.windowId.startsWith(FOLDER_WINDOW_PREFIX)) {
+          Object.assign(record, {
+            displayName: entry.title,
+            altText: entry.title,
+            folderContent: entry.content,
+            folderSize: entry.size,
+          });
+        } else {
+          Object.assign(record, {
+            displayName: `${entry.title}${notepad.titleSuffix}`,
+            altText: entry.title,
+            fileName: entry.title,
+            filePath: entry.path,
+          });
+        }
+      });
     },
 
     /**

@@ -42,6 +42,7 @@
     "binaryFile": "{name} is a binary file ({size} bytes). Open it from the desktop to view it.",
     "contentWarning": "Warning: {text}",
     "refreshHint": "This change is visible on the site. Press F5 to refresh the page.",
+    "siteUpdated": "The site has been updated.",
     "unableToCreateDir": "Unable to create directory",
     "rdFailed": "Invalid path, not directory,\nor directory not empty",
     "removeCurrentDir": "Attempt to remove current directory - {name}",

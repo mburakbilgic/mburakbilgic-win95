@@ -94,7 +94,7 @@ const onKeydown = async (event) => {
 }
 
 const onEditorClose = async () => {
-  shell.closeEditor()
+  await shell.closeEditor()
   await nextTick()
   scrollToBottom()
   focusInput()

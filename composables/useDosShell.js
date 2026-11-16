@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import dos from '@/content/dos.json'
 import { DOS_EOF_CHAR, DOS_HISTORY_MAX } from '@/constants/ui'
+import { useContentRefresh } from '@/composables/useContentRefresh'
 import {
   applyRenamePattern,
   fillTemplate,
@@ -60,7 +61,7 @@ const formatClock = (epochMs) => {
  *   expireSession: () => void,
  *   interrupt: () => boolean,
  *   saveEditor: (content: string) => Promise<{ ok: boolean, message: string }>,
- *   closeEditor: () => void,
+ *   closeEditor: () => Promise<void>,
  * }}
  * @example
  *   const shell = useDosShell({ onExit: closeWindow })
@@ -68,6 +69,7 @@ const formatClock = (epochMs) => {
  *   await shell.submit('dir /a')
  */
 export const useDosShell = ({ onExit, pickFiles }) => {
+  const refreshContent = useContentRefresh()
   const lines = ref([])
   const cwd = ref(dos.homePath)
   const admin = ref(false)
@@ -204,9 +206,9 @@ export const useDosShell = ({ onExit, pickFiles }) => {
    * @param {{ data?: object, error?: unknown, code?: string }} result
    * @param {string} name
    * @param {Record<string, string>} [errorMessages]
-   * @returns {object|null}
+   * @returns {Promise<object|null>}
    */
-  const reportWrite = (result, name, errorMessages = {}) => {
+  const reportWrite = async (result, name, errorMessages = {}) => {
     if (result.error) {
       const key = errorMessages[result.code]
       if (key) printError(message(key, { name }))
@@ -214,7 +216,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       return null
     }
     printWarnings(result.data)
-    if (result.data?.siteChanged) print(message('refreshHint'), 'dim')
+    await printRefreshHint(result.data?.siteChanged)
     return result.data
   }
 
@@ -237,8 +239,17 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     }
   }
 
-  const printRefreshHint = (siteChanged) => {
-    if (siteChanged) print(message('refreshHint'), 'dim')
+  /**
+   * After a write that changed the site: reloads the content so the
+   * desktop and open windows update in place, then tells the admin.
+   *
+   * @param {boolean} siteChanged
+   * @returns {Promise<void>}
+   */
+  const printRefreshHint = async (siteChanged) => {
+    if (!siteChanged) return
+    const refreshed = await refreshContent()
+    print(message(refreshed ? 'siteUpdated' : 'refreshHint'), 'dim')
   }
 
   /**
@@ -352,7 +363,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       printWarnings(result.data)
     }
     print(`${SUMMARY_INDENT}${message('filesCopied', { count: copied })}`)
-    if (siteChanged) print(message('refreshHint'), 'dim')
+    await printRefreshHint(siteChanged)
   }
 
   /**
@@ -403,7 +414,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     if (hasWildcard(parentDosPath(from).name)) {
       const { done, siteChanged } = await copyOrMoveMatches('copy', from, source, to, overwriteAll)
       print(`${SUMMARY_INDENT}${message('filesCopied', { count: done })}`)
-      printRefreshHint(siteChanged)
+      await printRefreshHint(siteChanged)
       return
     }
     const name = from.split('\\').pop()
@@ -417,7 +428,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     }
     if (!result.skipped) printWarnings(result.data)
     print(`${SUMMARY_INDENT}${message('filesCopied', { count: result.skipped ? 0 : 1 })}`)
-    if (result.data?.siteChanged) print(message('refreshHint'), 'dim')
+    await printRefreshHint(result.data?.siteChanged)
   }
 
   const startCopyCon = (destination, overwriteAll) => {
@@ -444,7 +455,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     else if (!result.skipped) printWarnings(result.data)
     const copied = !result.error && !result.skipped
     print(`${SUMMARY_INDENT}${message('filesCopied', { count: copied ? 1 : 0 })}`)
-    if (copied && result.data?.siteChanged) print(message('refreshHint'), 'dim')
+    await printRefreshHint(copied && result.data?.siteChanged)
   }
 
   const commands = {
@@ -479,7 +490,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       if (hasWildcard(parentDosPath(path).name)) {
         const files = await expandFiles(path, paths[0], { includeHidden: true })
         const { siteChanged } = await runBatch(files, (file) => post('/api/fs/attrib', { path: file.path, ...patch }))
-        printRefreshHint(siteChanged)
+        await printRefreshHint(siteChanged)
         return
       }
       await runWrite('/api/fs/attrib', { path, ...patch }, paths[0])
@@ -560,7 +571,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       if (!hasWildcard(parentDosPath(path).name)) {
         const result = await post('/api/fs/delete', { path, type: 'file' })
         if (result.code !== 'IS_A_DIR') {
-          reportWrite(result, args[0])
+          await reportWrite(result, args[0])
           return
         }
         pattern = joinDosPath(path, '*.*')
@@ -570,7 +581,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
       const files = await expandFiles(pattern, args[0])
       const { siteChanged } = await runBatch(files, (file) => post('/api/fs/delete', { path: file.path, type: 'file' }))
-      printRefreshHint(siteChanged)
+      await printRefreshHint(siteChanged)
     },
 
     async DELTREE({ args, switches }) {
@@ -592,7 +603,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
       const result = await post('/api/fs/delete', { path, recursive: true })
       if (!result.error) print(message('deleting', { name: args[0] }))
-      reportWrite(result, args[0])
+      await reportWrite(result, args[0])
     },
 
     async ECHO({ rest }) {
@@ -696,7 +707,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       const overwriteAll = switches.includes('Y')
       if (hasWildcard(parentDosPath(from).name)) {
         const { siteChanged } = await copyOrMoveMatches('move', from, args[0], to, overwriteAll)
-        printRefreshHint(siteChanged)
+        await printRefreshHint(siteChanged)
         return
       }
       const result = await withOverwritePrompt(args[0], (overwrite) => post('/api/fs/move', { from, to, overwrite }), {
@@ -709,7 +720,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       }
       printWarnings(result.data)
       reportMoved(result.data)
-      printRefreshHint(result.data?.siteChanged)
+      await printRefreshHint(result.data?.siteChanged)
     },
 
     async RD({ args, switches }) {
@@ -741,7 +752,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
         const { siteChanged } = await runBatch(files, (file) =>
           post('/api/fs/rename', { path: file.path, newName: applyRenamePattern(file.name, newName) }),
         )
-        printRefreshHint(siteChanged)
+        await printRefreshHint(siteChanged)
         return
       }
       const result = await runWrite('/api/fs/rename', { path, newName }, source, {
@@ -923,16 +934,17 @@ export const useDosShell = ({ onExit, pickFiles }) => {
   /**
    * Leaves EDIT and returns to the prompt, reporting what the saves did.
    *
-   * @returns {void}
+   * @returns {Promise<void>}
    */
-  const closeEditor = () => {
+  const closeEditor = async () => {
     if (!editor.value) return
     const session = editSession
+    mode.value = 'busy'
     editor.value = null
     editSession = null
     if (session?.saved) {
       session.warnings.forEach((text) => print(message('contentWarning', { text }), 'warn'))
-      if (session.siteChanged) print(message('refreshHint'), 'dim')
+      await printRefreshHint(session.siteChanged)
     }
     print('')
     mode.value = 'command'
