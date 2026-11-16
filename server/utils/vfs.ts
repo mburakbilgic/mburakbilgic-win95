@@ -117,21 +117,61 @@ export const findChild = (parentId: number, name: string): VfsNode | null => {
 }
 
 /**
- * Resolves an absolute path to its node.
+ * Resolves an absolute path to its node. Hidden nodes (and anything below
+ * them) are treated as missing unless `includeHidden` is set, so visitors
+ * cannot reach `ATTRIB +H` content by guessing its path.
  *
  * @param {string} path
- * @returns {VfsNode | null} `null` when any segment does not exist.
+ * @param {{ includeHidden?: boolean }} [options]
+ * @returns {VfsNode | null} `null` when any segment does not exist or is hidden.
  * @throws {VfsError} INVALID_PATH for malformed paths.
  * @example
- *   resolveVfsPath('C:\\MBURAKBILGIC\\SITE.INI')
+ *   resolveVfsPath('C:\MBURAKBILGIC\SITE.INI', { includeHidden: isAdmin(event) })
  */
-export const resolveVfsPath = (path: string): VfsNode | null => {
+export const resolveVfsPath = (path: string, options: { includeHidden?: boolean } = {}): VfsNode | null => {
   let node: VfsNode | null = getRootNode()
   for (const segment of splitVfsPath(path)) {
     if (!node || node.type !== 'dir') return null
     node = findChild(node.id, segment)
+    if (node && node.hidden && !options.includeHidden) return null
   }
   return node
+}
+
+/**
+ * Builds the canonical absolute path of a node using the stored names
+ * (so `c:/mburakbilgic/desktop` comes back as `C:\MBURAKBILGIC\DESKTOP`).
+ *
+ * @param {VfsNode} node
+ * @returns {string}
+ * @example
+ *   vfsNodePath(desktop) // → 'C:\MBURAKBILGIC\DESKTOP'
+ */
+export const vfsNodePath = (node: VfsNode): string => {
+  const names: string[] = []
+  let current: NodeRow | undefined = { id: node.id, parent_id: node.parentId, name: node.name } as NodeRow
+  const parentStatement = useDb().prepare('SELECT * FROM nodes WHERE id = ?')
+  while (current && current.parent_id !== null) {
+    names.unshift(current.name)
+    current = parentStatement.get(current.parent_id) as NodeRow | undefined
+  }
+  return `${VFS_DRIVE}\\${names.join('\\')}`
+}
+
+/**
+ * Converts a VfsError into the HTTP error the DOS shell understands;
+ * anything else is re-thrown untouched.
+ *
+ * @param {unknown} error
+ * @returns {never}
+ * @throws {H3Error} 400 for bad paths/names, 404 for missing nodes, 409 for conflicts.
+ * @example
+ *   try { ... } catch (e) { throwVfsHttpError(e) }
+ */
+export const throwVfsHttpError = (error: unknown): never => {
+  if (!(error instanceof VfsError)) throw error
+  const statusCode = { INVALID_PATH: 400, INVALID_NAME: 400, NOT_A_DIR: 400, NOT_FOUND: 404, EXISTS: 409 }[error.code]
+  throw createError({ statusCode, statusMessage: error.code, data: { code: error.code } })
 }
 
 /**

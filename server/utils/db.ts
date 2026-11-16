@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS nodes (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS nodes_parent_name ON nodes (parent_id, name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS nodes_parent ON nodes (parent_id);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash  TEXT PRIMARY KEY,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  ip          TEXT
+);
 `
 
 let db: Database.Database | null = null

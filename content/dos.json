@@ -1,0 +1,62 @@
+{
+  "volumeLabel": "MBURAKBILGIC",
+  "volumeSerial": "1996-1116",
+  "homePath": "C:\\MBURAKBILGIC",
+  "adminPromptPrefix": "ADMIN ",
+  "banner": [
+    "Microsoft(R) Windows 95",
+    "   (C)Copyright Microsoft Corp 1981-1996.",
+    "",
+    "Type HELP for a list of commands.",
+    ""
+  ],
+  "version": "Windows 95. [Version 4.00.950]",
+  "messages": {
+    "badCommand": "Bad command or file name",
+    "fileNotFound": "File not found - {name}",
+    "invalidDirectory": "Invalid directory",
+    "invalidPath": "Invalid path",
+    "accessDenied": "Access denied",
+    "invalidDrive": "Invalid drive specification",
+    "driveNotReady": "Not ready reading drive {drive}\nAbort, Retry, Fail?",
+    "generalFailure": "General failure reading drive C\nAbort, Retry, Fail?",
+    "requiredParameter": "Required parameter missing",
+    "invalidSwitch": "Invalid switch - {switch}",
+    "tooManyParameters": "Too many parameters - {param}",
+    "passwordPrompt": "Password: ",
+    "loginOk": "Access granted. Session expires at {time}.",
+    "loginFailed": "Access denied.",
+    "tooManyAttempts": "Too many failed attempts. Try again in 15 minutes.",
+    "authNotConfigured": "Admin login is not configured on this server.",
+    "alreadyLoggedIn": "Already logged in. Session expires at {time}.",
+    "notLoggedIn": "Not logged in.",
+    "loggedOut": "Logged out.",
+    "sessionExpired": "Session expired. Type LOGIN to sign in again."
+  },
+  "dir": {
+    "volume": " Volume in drive C is {label}",
+    "serial": " Volume Serial Number is {serial}",
+    "directoryOf": " Directory of {path}",
+    "dirTag": "<DIR>",
+    "files": "file(s)",
+    "dirs": "dir(s)",
+    "bytes": "bytes"
+  },
+  "tree": {
+    "header": "Folder PATH listing for volume {label}",
+    "serial": "Volume serial number is {serial}",
+    "noSubfolders": "No subfolders exist"
+  },
+  "help": [
+    { "command": "CD", "text": "Displays the name of or changes the current directory." },
+    { "command": "CLS", "text": "Clears the screen." },
+    { "command": "DIR", "text": "Displays a list of files and subdirectories. DIR [path] [/A]" },
+    { "command": "EXIT", "text": "Quits the MS-DOS Prompt." },
+    { "command": "HELP", "text": "Provides help information for commands." },
+    { "command": "LOGIN", "text": "Signs in as administrator." },
+    { "command": "LOGOUT", "text": "Signs out of the administrator session." },
+    { "command": "TREE", "text": "Graphically displays the folder structure. TREE [path] [/F]" },
+    { "command": "TYPE", "text": "Displays the contents of a text file." },
+    { "command": "VER", "text": "Displays the Windows version." }
+  ]
+}

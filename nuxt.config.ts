@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   ],
   runtimeConfig: {
     dbPath: '',
+    adminPasswordHash: '',
     mailSmtpHost: '',
     mailSmtpPort: '',
     mailSmtpUser: '',

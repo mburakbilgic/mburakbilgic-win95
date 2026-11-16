@@ -11,6 +11,7 @@ import ImagePreviewWindow from './templates/ImagePreviewWindow.vue'
 import StartMenu from './templates/StartMenu.vue'
 import Projects from './views/Projects.vue'
 import DosReadme from './views/DosReadme.vue'
+import DosPrompt from './views/DosPrompt.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
@@ -42,6 +43,7 @@ const slotViews = [
   { name: 'techmonolith', comp: TechMonolith },
   { name: 'projects', comp: Projects },
   { name: 'dosReadme', comp: DosReadme },
+  { name: 'dosPrompt', comp: DosPrompt },
 ]
 
 const windowCheck = (windowId) => {

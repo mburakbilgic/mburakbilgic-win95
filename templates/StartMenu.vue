@@ -1,7 +1,17 @@
 <script setup>
 import { useContent } from '@/composables/useContent'
+import { useImagePath } from '@/composables/useImagePath'
+import { useWindowsStore } from '@/stores/windows'
+import { DOS_PROMPT_WINDOW_ID } from '@/constants/ui'
 
 const { social } = useContent()
+const { iconPath } = useImagePath()
+const windowsStore = useWindowsStore()
+const dosPromptWindow = windowsStore.getWindowById(DOS_PROMPT_WINDOW_ID)
+
+const openDosPrompt = () => {
+  windowsStore.setWindowState({ windowState: 'open', windowId: DOS_PROMPT_WINDOW_ID })
+}
 const resumeUrl = useRuntimeConfig().public.resumePdfUrl
 
 const socialIcons = import.meta.glob('@/assets/iPhone-Icons/*.webp', { eager: true })
@@ -34,6 +44,12 @@ const resolveSocialIcon = (iconFile) => {
         </a>
       </template>
       <div class="divider"></div>
+      <a v-if="dosPromptWindow" href="#" @click.prevent="openDosPrompt">
+        <div class="bar">
+          <img class="social-image" :src="iconPath(dosPromptWindow.iconImage)" :alt="dosPromptWindow.altText" />
+          <span class="bar-label"><u>{{ dosPromptWindow.displayName.charAt(0) }}</u>{{ dosPromptWindow.displayName.slice(1) }}</span>
+        </div>
+      </a>
       <a v-if="resumeUrl" :href="resumeUrl" target="_blank">
         <div class="bar">
           <img class="social-image" src="@/assets/win95Icons/resume.png" />
@@ -116,6 +132,10 @@ a {
     flex-direction: row;
     padding: 5px 10px 5px 10px;
     align-items: center;
+}
+
+.bar-label {
+    white-space: nowrap;
 }
 
 .bar:hover {

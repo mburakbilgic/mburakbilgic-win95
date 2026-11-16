@@ -106,5 +106,20 @@
     "fullscreen": false,
     "showInNavbar": true,
     "photoFolder": true
+  },
+  {
+    "windowId": "DosPromptWindow",
+    "windowState": "close",
+    "displayName": "MS-DOS Prompt",
+    "windowComponent": "window",
+    "windowContent": "dosPrompt",
+    "windowContentPadding": { "top": "0px", "right": "0px", "bottom": "0px", "left": "0px" },
+    "position": "absolute",
+    "positionX": "12vw",
+    "positionY": "10vh",
+    "iconImage": "msdos.png",
+    "altText": "MS-DOS Prompt",
+    "fullscreen": false,
+    "showInNavbar": true
   }
 ]

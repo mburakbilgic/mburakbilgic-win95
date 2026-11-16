@@ -12,3 +12,14 @@ export const SCREEN_FALLBACK_SIZE_PX = 9999
  * because their top-bar and content padding collapse.
  */
 export const WINDOW_MIN_SIZE_PX = 400
+
+/**
+ * Window id of the MS-DOS Prompt (admin shell); shared by the Start menu
+ * entry, the EXIT command and `content/windows.json`.
+ */
+export const DOS_PROMPT_WINDOW_ID = 'DosPromptWindow'
+
+/**
+ * How many commands the MS-DOS Prompt remembers for ↑/↓ recall.
+ */
+export const DOS_HISTORY_MAX = 50
