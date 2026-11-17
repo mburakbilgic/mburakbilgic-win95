@@ -26,7 +26,47 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at  INTEGER NOT NULL,
   ip          TEXT
 );
+CREATE TABLE IF NOT EXISTS meta (
+  key    TEXT PRIMARY KEY,
+  value  TEXT
+);
+CREATE TABLE IF NOT EXISTS mail_events (
+  id          INTEGER PRIMARY KEY,
+  created_at  INTEGER NOT NULL,
+  ip          TEXT,
+  sender      TEXT,
+  body_hash   TEXT,
+  verdict     TEXT NOT NULL,
+  score       INTEGER NOT NULL,
+  reasons     TEXT NOT NULL DEFAULT '[]',
+  mailed      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS mail_events_created ON mail_events (created_at);
 `
+
+/**
+ * Reads a value from the `meta` key/value table.
+ *
+ * @param {string} key
+ * @returns {string|null}
+ * @example
+ *   getMeta('lastAdminLogin')
+ */
+export const getMeta = (key: string): string | null =>
+  (useDb().prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null
+
+/**
+ * Writes a value to the `meta` key/value table.
+ *
+ * @param {string} key
+ * @param {string} value
+ * @returns {void}
+ * @example
+ *   setMeta('lastAdminLogin', new Date().toISOString())
+ */
+export const setMeta = (key: string, value: string): void => {
+  useDb().prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value)
+}
 
 let db: Database.Database | null = null
 

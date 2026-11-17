@@ -84,6 +84,33 @@ export const splitRedirect = (text) => {
 export const formatAttribLine = (entry, path) =>
   `      ${entry.hidden ? 'H' : ' '}${entry.readonly ? 'R' : ' '}     ${path}`
 
+const MAIL_ROW_NUMBER_WIDTH = 3
+const MAIL_ROW_DATE_CHARS = 16
+const MAIL_ROW_SCORE_WIDTH = 3
+const MAIL_ROW_FROM_WIDTH = 26
+const MAIL_ROW_SUBJECT_WIDTH = 30
+
+const fit = (text, width) => (text.length > width ? `${text.slice(0, width - 1)}~` : text.padEnd(width))
+
+/**
+ * Formats one line of the `MAIL` listing: number, date, spam score,
+ * sender and subject in fixed columns.
+ *
+ * @param {number} number 1-based message number (used by `MAIL n`).
+ * @param {{ date: string, score: string, from: string, subject: string }} message
+ * @returns {string}
+ * @example
+ *   formatMailRow(1, { date: '2026-11-16 15:30:05', score: '20 (pass)', from: 'a@b.com', subject: 'Hi' })
+ */
+export const formatMailRow = (number, message) =>
+  [
+    `${String(number).padStart(MAIL_ROW_NUMBER_WIDTH)}.`,
+    message.date.slice(0, MAIL_ROW_DATE_CHARS).padEnd(MAIL_ROW_DATE_CHARS),
+    String(Number.parseInt(message.score, 10) || 0).padStart(MAIL_ROW_SCORE_WIDTH),
+    fit(message.from, MAIL_ROW_FROM_WIDTH),
+    fit(message.subject, MAIL_ROW_SUBJECT_WIDTH).trimEnd(),
+  ].join('  ')
+
 /**
  * Whether a DOS argument contains `*` or `?`.
  *

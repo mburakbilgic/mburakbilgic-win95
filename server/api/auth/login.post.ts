@@ -14,5 +14,5 @@ export default defineEventHandler(async (event) => {
   }
 
   clearFailedLogins(ip)
-  return { admin: true, expiresAt: createSession(event) }
+  return { admin: true, expiresAt: createSession(event), newMessages: takeNewMessageCount() }
 })

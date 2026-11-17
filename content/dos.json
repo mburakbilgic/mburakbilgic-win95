@@ -72,6 +72,16 @@
     "serial": "Volume serial number is {serial}",
     "noSubfolders": "No subfolders exist"
   },
+  "mail": {
+    "newMessages": "You have {count} new message(s). Type MAIL to list them.",
+    "folder": " {name} ({count})   {path}",
+    "empty": "    (empty)",
+    "hint": "MAIL n reads message n. Messages are files: DEL, MOVE and TYPE work on them. MAIL /S shows spam statistics.",
+    "noSuchMessage": "No message number {number}. Type MAIL to list messages.",
+    "statsHeader": "Last {days} days: {total} message(s), {mailed} sent to the inbox by e-mail",
+    "statsReasons": "Most frequent spam rule hits:",
+    "statsNoReasons": "No spam rules were triggered."
+  },
   "editor": {
     "menuFile": "File",
     "save": "Save",
@@ -139,6 +149,10 @@
     {
       "command": "LOGOUT",
       "text": "Signs out of the administrator session."
+    },
+    {
+      "command": "MAIL",
+      "text": "Lists contact messages (MAIL n reads one, MAIL /S spam statistics)."
     },
     {
       "command": "MD",

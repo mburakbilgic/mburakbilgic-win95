@@ -7,6 +7,7 @@ import {
   fillTemplate,
   formatAttribLine,
   formatDirListing,
+  formatMailRow,
   formatTree,
   hasWildcard,
   isSameOrInside,
@@ -25,6 +26,9 @@ const ECHO_DELIMITER = /[\s.,:;=+/([\]]/
 const ATTRIB_FLAG = /^([+-])([RH])$/i
 const RENAME_INVALID_NAME = /[\\/:]/
 const DRIVE_ROOT_LENGTH = 3
+const MAIL_FOLDER_LINE_CLASS = { REVIEW: 'warn', SPAM: 'dim' }
+const MAIL_STATS_LABEL_WIDTH = 8
+const MAIL_STATS_COUNT_WIDTH = 5
 
 const parentDosPath = (path) => {
   const index = path.lastIndexOf('\\')
@@ -431,6 +435,30 @@ export const useDosShell = ({ onExit, pickFiles }) => {
     await printRefreshHint(result.data?.siteChanged)
   }
 
+  const printMailbox = (folders) => {
+    let number = 0
+    folders.forEach((folder) => {
+      print(fillTemplate(dos.mail.folder, { name: folder.name, count: folder.messages.length, path: folder.path }))
+      if (!folder.messages.length) print(dos.mail.empty, 'dim')
+      folder.messages.forEach((m) => {
+        number++
+        print(formatMailRow(number, m), MAIL_FOLDER_LINE_CLASS[folder.name] || '')
+      })
+      print('')
+    })
+    print(dos.mail.hint, 'dim')
+  }
+
+  const printMailStats = (stats) => {
+    print(fillTemplate(dos.mail.statsHeader, stats))
+    Object.entries(stats.verdicts).forEach(([verdict, count]) =>
+      print(`  ${verdict.padEnd(MAIL_STATS_LABEL_WIDTH)}${String(count).padStart(MAIL_STATS_COUNT_WIDTH)}`),
+    )
+    print('')
+    print(stats.reasons.length ? dos.mail.statsReasons : dos.mail.statsNoReasons)
+    stats.reasons.forEach(({ reason, count }) => print(`  ${String(count).padStart(MAIL_STATS_COUNT_WIDTH)}  ${reason}`))
+  }
+
   const startCopyCon = (destination, overwriteAll) => {
     if (!destination) {
       printError(message('requiredParameter'))
@@ -686,6 +714,37 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       print(message('loggedOut'))
     },
 
+    async MAIL({ args, switches }) {
+      if (!assertSwitches(switches, ['S']) || !requireAdminSession()) return
+      if (args.length > 1) {
+        printError(message('tooManyParameters', { param: args[1] }))
+        return
+      }
+      try {
+        if (switches.includes('S')) {
+          printMailStats(await $fetch('/api/mail/stats'))
+          return
+        }
+        const { folders } = await $fetch('/api/mail/messages')
+        if (!args.length) {
+          printMailbox(folders)
+          return
+        }
+        const messages = folders.flatMap((folder) => folder.messages.map((m) => ({ ...m, path: `${folder.path}\\${m.name}` })))
+        const selected = messages[Number(args[0]) - 1]
+        if (!/^\d+$/.test(args[0]) || !selected) {
+          printError(fillTemplate(dos.mail.noSuchMessage, { number: args[0] }))
+          return
+        }
+        const file = await $fetch('/api/fs/read', { query: { path: selected.path } })
+        print(selected.path, 'dim')
+        print('')
+        print(file.content)
+      } catch (error) {
+        reportFsError(error, 'MAIL')
+      }
+    },
+
     async MD({ args, switches }) {
       if (!assertSwitches(switches, []) || !requireArgCount(args, 1) || !requireAdminSession()) return
       const path = resolveArg(args[0])
@@ -814,6 +873,7 @@ export const useDosShell = ({ onExit, pickFiles }) => {
       admin.value = true
       expiresAt.value = result.expiresAt
       print(message('loginOk', { time: formatClock(result.expiresAt) }), 'ok')
+      if (result.newMessages > 0) print(fillTemplate(dos.mail.newMessages, { count: result.newMessages }), 'warn')
     } catch (error) {
       const code = errorCode(error)
       if (code === 'TOO_MANY_ATTEMPTS') printError(message('tooManyAttempts'))
