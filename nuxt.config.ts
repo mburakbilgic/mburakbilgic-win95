@@ -20,10 +20,6 @@ export default defineNuxtConfig({
     mailSmtpPass: '',
     mailTo: '',
     mailFormSecret: '',
-    public: {
-      resumePdfUrl: process.env.NUXT_PUBLIC_RESUME_PDF_URL || '',
-      resumePreviewUrl: process.env.NUXT_PUBLIC_RESUME_PREVIEW_URL || '',
-    },
   },
   vite: {
     build: {

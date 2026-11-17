@@ -1,39 +1,7 @@
 {
-  "folderSize": 11425756,
   "folders": [
-    {
-      "id": 0,
-      "title": "Green Hell (23-24)",
-      "type": "folder",
-      "altText": "Green Hell (23-24)",
-      "size": 8578813,
-      "content": [
-        { "id": 0, "title": "Grey Room.JPG",  "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GH_0", "altText": "Grey Room.JPG",  "size": 480385 },
-        { "id": 1, "title": "Night Raids.JPG","type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GH_1", "altText": "Night Raids.JPG","size": 138645 },
-        { "id": 2, "title": "PMC WINS.JPG",   "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GH_2", "altText": "PMC WINS.JPG",   "size": 6238239 },
-        { "id": 3, "title": "Red Forest.JPG", "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GH_3", "altText": "Red Forest.JPG", "size": 1721544 }
-      ]
-    },
-    {
-      "id": 1,
-      "title": "Gladio (24-25)",
-      "type": "folder",
-      "altText": "Gladio (24-25)",
-      "size": 199288,
-      "content": [
-        { "id": 0, "title": "Got Light.JPG",    "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GLADIO_0", "altText": "Got Light.JPG",    "size": 56159 },
-        { "id": 1, "title": "Look Forward.JPG", "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_GLADIO_1", "altText": "Look Forward.JPG", "size": 143129 }
-      ]
-    },
-    {
-      "id": 2,
-      "title": "Ins-tractors (24-25)",
-      "type": "folder",
-      "altText": "Ins-tractors (24-25)",
-      "size": 211946,
-      "content": [
-        { "id": 0, "title": "Ins-Tractors.JPG", "type": "photo", "srcEnv": "NUXT_PUBLIC_PHOTOS_INSTRACTORS_0", "altText": "Ins-Tractors.JPG", "size": 211946 }
-      ]
-    }
+    { "title": "Green Hell (23-24)" },
+    { "title": "Gladio (24-25)" },
+    { "title": "Ins-tractors (24-25)" }
   ]
 }

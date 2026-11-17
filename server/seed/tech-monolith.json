@@ -1,5 +1,5 @@
 {
-  "logoUrl": "https://storage.googleapis.com/mburakbilgic.com/photos/tech-monolith/techmonolith-dark-logo-2.png",
+  "logoUrl": "techmonolith-dark-logo-2.png",
   "logoAlt": "Tech Monolith logo",
   "companyUrl": "https://www.techmonolith.com",
   "companyLabel": "Tech Monolith Corp.",
@@ -12,7 +12,7 @@
         { "id": "stack", "text": "On the application side, I decided to move with the MERN stack to follow the up-to-date community. On the AI prediction and ETL side, I decided to form the backend with FastAPI. I used models of LLM from Ollama2, and I decided to use GCP for the cloud platform. The project also had Google Cloud OCR and Cloud Storage. WhatsApp API was used from the meta platform." }
       ],
       "image": {
-        "url": "https://storage.googleapis.com/mburakbilgic.com/photos/tech-monolith/onco-ai-web.PNG",
+        "url": "onco-ai-web.png",
         "caption": "Onco-AI",
         "variant": "cover"
       }
@@ -45,7 +45,7 @@
         { "id": "images", "text": "At below images you can see the alfa releases device." }
       ],
       "image": {
-        "url": "https://storage.googleapis.com/mburakbilgic.com/photos/tech-monolith/project-draft.png",
+        "url": "project-draft.png",
         "caption": "Home Based Exercise Monitoring Device",
         "variant": "full"
       }

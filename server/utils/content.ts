@@ -115,7 +115,6 @@ const buildBio = (home: VfsNode, warn: Warn) => {
     aboutParagraphs: toParagraphs(about.body).map((text, index) => ({ id: `about-${index + 1}`, text })),
     employment,
     resumeLinkLabel: about.headers.resumelabel || '',
-    resumeLocalPath: about.headers.resumepath || '',
     resumeUrl: resolveAssetRef(about.headers.resumepath, bioDir, { localOnly: true }),
   }
 }

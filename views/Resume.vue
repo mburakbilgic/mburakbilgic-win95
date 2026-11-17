@@ -1,25 +1,24 @@
 <script setup>
+import { computed } from 'vue'
 import { useWindowsStore } from '@/stores/windows'
 import { useContent } from '@/composables/useContent'
 
 const windowsStore = useWindowsStore()
 const { bio } = useContent()
-const runtimeConfig = useRuntimeConfig()
-const resumePdfUrl = bio.resumeUrl || runtimeConfig.public.resumePdfUrl
-const resumePreviewUrl = bio.resumeUrl || runtimeConfig.public.resumePreviewUrl
+const resumeUrl = computed(() => bio.resumeUrl)
 </script>
 
 <template>
-<div style="display: flex; height: 100%; flex-direction: column">
+<div v-if="resumeUrl" style="display: flex; height: 100%; flex-direction: column">
     <nav class="download-bar">
-        <a :href="resumePdfUrl" class="download" style="z-index: 10" download target="_blank">
+        <a :href="resumeUrl" class="download" style="z-index: 10" download target="_blank">
             <span style="display: flex" class="border">
                 <img src="@/assets/Resume/download.png" class="icon-image" />
                 <p style="margin-top: 2px">Download</p>
             </span>
         </a>
 
-        <a :href="resumePdfUrl" class="download" style="z-index: 10" target="_blank">
+        <a :href="resumeUrl" class="download" style="z-index: 10" target="_blank">
             <span style="display: flex" class="border">
                 <img src="@/assets/Resume/open.png" class="icon-image" />
                 <p style="margin-top: 2px">Open In New Tab</p>
@@ -27,7 +26,7 @@ const resumePreviewUrl = bio.resumeUrl || runtimeConfig.public.resumePreviewUrl
         </a>
     </nav>
     <div class="frame" style="z-index: 99">
-        <iframe class="frame" :src="resumePreviewUrl"></iframe>
+        <iframe class="frame" :src="resumeUrl"></iframe>
         <span v-if="windowsStore.activeWindow != 'ResumeWindow'" style="bottom: 0; left: 0; width: 100%; height: 95%; position: absolute" class="overlay"></span>
     </div>
 </div>

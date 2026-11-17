@@ -60,7 +60,7 @@ const seedBio = (homeId: number) => {
     {
       Intro: bioSeed.aboutIntroTemplate,
       ResumeLabel: bioSeed.resumeLinkLabel,
-      ResumePath: bioSeed.resumeLocalPath,
+      ResumePath: bioSeed.resumePath,
     },
     bioSeed.aboutParagraphs.map((p) => p.text).join('\n\n'),
   ))
@@ -115,12 +115,7 @@ const seedTechMonolith = (homeId: number) => {
 const seedPhotos = (homeId: number) => {
   const dir = writeDir(homeId, CONTENT_DIRS.photos)
   photosSeed.folders.forEach((folder, folderIndex) => {
-    const folderNode = writeDir(dir.id, folder.title, folderIndex)
-    folder.content.forEach((item, itemIndex) => {
-      const url = (item.srcEnv && process.env[item.srcEnv]) || ''
-      if (!url) console.warn(`[seed] ${item.srcEnv} is empty; ${folder.title}\\${item.title} will be skipped until a URL is written to it.`)
-      writeFile(folderNode.id, item.title, url, { size: item.size, sortOrder: itemIndex })
-    })
+    writeDir(dir.id, folder.title, folderIndex)
   })
 }
 
@@ -136,8 +131,9 @@ const seedSocial = (homeId: number) => {
 
 /**
  * Populates an empty database with the site's initial content tree from
- * `server/seed/*.json` and `content/windows.json`. Photo URLs are read
- * once from the legacy `NUXT_PUBLIC_PHOTOS_*` env vars. Does nothing when
+ * `server/seed/*.json` and `content/windows.json`. Photo albums are
+ * created empty; images and the résumé are uploaded from DOS (`COPY A:`),
+ * so nothing points to an external host. Does nothing when
  * `C:\MBURAKBILGIC` already exists, so it never overwrites admin edits.
  *
  * @returns {boolean} `true` when the tree was created.

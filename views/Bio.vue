@@ -52,11 +52,11 @@ const aboutIntro = (bio.aboutIntroTemplate || '').replace('{age}', String(curren
       <p class="font-thin text-sm pb-2.5" style="white-space: pre-line">{{ job.description }}</p>
     </div>
 
-    <div class="pt-7">
+    <div v-if="bio.resumeUrl" class="pt-7">
       <h3 class="pb-1"><b>Résumé</b></h3>
       <a
         style="color: #ff5733"
-        :href="bio.resumeUrl || bio.resumeLocalPath"
+        :href="bio.resumeUrl"
         class="font-thin text-sm pb-2.5"
       >{{ bio.resumeLinkLabel }}</a>
     </div>

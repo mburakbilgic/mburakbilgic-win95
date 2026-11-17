@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { useContent } from '@/composables/useContent'
 import { useImagePath } from '@/composables/useImagePath'
 import { useWindowsStore } from '@/stores/windows'
@@ -12,7 +13,7 @@ const dosPromptWindow = windowsStore.getWindowById(DOS_PROMPT_WINDOW_ID)
 const openDosPrompt = () => {
   windowsStore.setWindowState({ windowState: 'open', windowId: DOS_PROMPT_WINDOW_ID })
 }
-const resumeUrl = bio.resumeUrl || useRuntimeConfig().public.resumePdfUrl
+const resumeUrl = computed(() => bio.resumeUrl)
 
 const socialIcons = import.meta.glob('@/assets/iPhone-Icons/*.webp', { eager: true })
 
