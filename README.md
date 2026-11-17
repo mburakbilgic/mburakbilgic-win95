@@ -87,8 +87,6 @@ Sırlar yalnızca sunucuda okunur, hiçbiri `NUXT_PUBLIC_` önekiyle tanımlanma
 | `NUXT_MAIL_FORM_SECRET` | Önerilir | Mail formu için sunucu sırrı (32+ rastgele karakter, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
 | `TZ` | Hayır | Mesaj tarihleri sunucu saatiyle yazılır; VPS UTC ise `TZ=Europe/Istanbul` |
 | `NUXT_DB_PATH` | Hayır | Veritabanı yolu; varsayılan `.data/site.db`. Yüklenen dosyalar aynı klasördeki `files/` altına yazılır |
-| `NUXT_PUBLIC_RESUME_PDF_URL` / `_PREVIEW_URL` | Hayır | DOS'tan CV yüklenmemişse kullanılan yedek bağlantılar |
-| `NUXT_PUBLIC_PHOTOS_*` | Hayır | Yalnızca boş veritabanını ilk doldururken okunur |
 | `NITRO_HOST` / `NITRO_PORT` | Hayır | Production'da dinlenecek adres/port; varsayılan `0.0.0.0:3000` |
 
 **Google uygulama şifresi:** Hesapta 2 Adımlı Doğrulama açık olmalı
@@ -444,7 +442,7 @@ Kalıcı silmek için `DEL PROJECTS\hrms.INI`.
 ### 3. CV'yi güncellemek
 
 `BIO\ABOUT.TXT` içindeki `ResumePath:` satırı CV'yi gösterir
-(ör. `ResumePath: /files/mburakbilgic_en.pdf`). BIO klasörüne **aynı adla**
+(ör. `ResumePath: mburakbilgic_en.pdf`). BIO klasörüne **aynı adla**
 bir PDF yüklemen yeterli:
 
 ```
@@ -515,15 +513,16 @@ ECHO Yeni paragrafın metni. >> BIO\ABOUT.TXT
 
 ### 7. Tech Monolith görselleri ve yeni bölüm
 
-Bölümlerdeki `Image:` satırları eski bucket URL'lerini gösteriyor
-(ör. `.../onco-ai-web.PNG`). Görseli **aynı adla** TECHMON'a yüklemek yeterli:
+Bölümlerdeki `Image:` satırları TECHMON klasöründeki görselin adını gösterir
+(ör. `Image: onco-ai-web.png`). Görseli **bu adla** TECHMON'a yükle:
 
 ```
 CD TECHMON
 COPY A:\*.*
 ```
 
-Logo için `TECHMON.INI` içindeki `LogoUrl=` adıyla aynı dosyayı yükle.
+Logo için `TECHMON.INI` içindeki `LogoUrl=` adıyla aynı dosyayı yükle
+(ör. `LogoUrl=techmonolith-dark-logo-2.png`).
 
 Yeni bölüm:
 
@@ -729,8 +728,6 @@ Secrets are read only on the server; none of them uses the `NUXT_PUBLIC_` prefix
 | `NUXT_MAIL_FORM_SECRET` | Recommended | Server secret for the mail form (32+ random characters, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
 | `TZ` | No | Message dates use server time; on a UTC VPS set `TZ=Europe/Istanbul` |
 | `NUXT_DB_PATH` | No | Database path; default `.data/site.db`. Uploaded files go to `files/` next to it |
-| `NUXT_PUBLIC_RESUME_PDF_URL` / `_PREVIEW_URL` | No | Fallback links used until a résumé is uploaded from DOS |
-| `NUXT_PUBLIC_PHOTOS_*` | No | Read only when seeding an empty database |
 | `NITRO_HOST` / `NITRO_PORT` | No | Production listen address/port; default `0.0.0.0:3000` |
 
 **Google app password:** 2-Step Verification must be on for the account (in
@@ -1087,7 +1084,7 @@ brings it back. To delete it permanently: `DEL PROJECTS\hrms.INI`.
 ### 3. Update the résumé
 
 The `ResumePath:` line in `BIO\ABOUT.TXT` points to the résumé
-(e.g. `ResumePath: /files/mburakbilgic_en.pdf`). Uploading a PDF with
+(e.g. `ResumePath: mburakbilgic_en.pdf`). Uploading a PDF with
 **the same name** to the BIO folder is enough:
 
 ```
@@ -1157,16 +1154,17 @@ ECHO The new paragraph. >> BIO\ABOUT.TXT
 
 ### 7. Tech Monolith images and a new section
 
-The `Image:` lines in the sections still point to old bucket URLs
-(e.g. `.../onco-ai-web.PNG`). Uploading the image to TECHMON under
-**the same name** is enough:
+The `Image:` lines in the sections name an image in the TECHMON folder
+(e.g. `Image: onco-ai-web.png`). Upload the image to TECHMON under
+**that name**:
 
 ```
 CD TECHMON
 COPY A:\*.*
 ```
 
-For the logo, upload a file with the same name as in `LogoUrl=` in `TECHMON.INI`.
+For the logo, upload a file with the same name as in `LogoUrl=` in `TECHMON.INI`
+(e.g. `LogoUrl=techmonolith-dark-logo-2.png`).
 
 A new section:
 
