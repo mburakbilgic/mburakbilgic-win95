@@ -21,6 +21,7 @@ admin paneli yoktur.
 - [Sunucuya kurulum (VPS)](#sunucuya-kurulum-vps)
 - [Güncelleme, yedekleme, geri yükleme](#güncelleme-yedekleme-geri-yükleme)
 - [DOS ile içerik yönetimi](#dos-ile-içerik-yönetimi)
+- [Mail kutusu](#mail-kutusu)
 - [Kullanım senaryoları](#kullanım-senaryoları)
 - [Sorun giderme](#sorun-giderme)
 
@@ -83,6 +84,8 @@ Sırlar yalnızca sunucuda okunur, hiçbiri `NUXT_PUBLIC_` önekiyle tanımlanma
 | `NUXT_MAIL_SMTP_USER` | Mail için | Gönderen hesap, ör. `iletisim@alanadi.com` |
 | `NUXT_MAIL_SMTP_PASS` | Mail için | Google **uygulama şifresi** (normal şifre değil) |
 | `NUXT_MAIL_TO` | Hayır | Mesajların düşeceği kutu; boşsa SMTP kullanıcısı |
+| `NUXT_MAIL_FORM_SECRET` | Önerilir | Mail formu için sunucu sırrı (32+ rastgele karakter, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
+| `TZ` | Hayır | Mesaj tarihleri sunucu saatiyle yazılır; VPS UTC ise `TZ=Europe/Istanbul` |
 | `NUXT_DB_PATH` | Hayır | Veritabanı yolu; varsayılan `.data/site.db`. Yüklenen dosyalar aynı klasördeki `files/` altına yazılır |
 | `NUXT_PUBLIC_RESUME_PDF_URL` / `_PREVIEW_URL` | Hayır | DOS'tan CV yüklenmemişse kullanılan yedek bağlantılar |
 | `NUXT_PUBLIC_PHOTOS_*` | Hayır | Yalnızca boş veritabanını ilk doldururken okunur |
@@ -153,7 +156,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
     }
 }
 ```
@@ -166,6 +169,11 @@ sudo certbot --nginx -d mburakbilgic.com -d www.mburakbilgic.com
 `X-Forwarded-Host` ve `X-Forwarded-Proto` başlıkları **zorunlu**: DOS'taki
 yazma komutları isteğin siteden geldiğini bu başlıklarla doğrular. Eksikse
 `LOGIN` çalışır ama her yazma komutu `General failure reading drive C` verir.
+
+`X-Forwarded-For $remote_addr` başlığı istemcinin gönderdiğini **ezer**.
+`$proxy_add_x_forwarded_for` kullanma: istemcinin uydurduğu IP'yi listenin
+başına bırakır ve uygulama ilk IP'yi okuduğu için saldırgan her istekte farklı
+bir IP göstererek mail rate limit'ini ve `LOGIN` kilidini aşabilir.
 
 Site HTTPS üzerinden açılmalı: production'da oturum çerezi yalnızca HTTPS'te
 gönderilir. `http://` veya IP ile açarsan `LOGIN` başarılı görünür ama ilk
@@ -244,6 +252,7 @@ ADMIN C:\MBURAKBILGIC>
 | `CD` | `CD BIO\JOBS`, `CD ..`, `CD \` | Klasör değiştirir |
 | `TREE [yol] [/F]` | `TREE /F` | Klasör ağacı; `/F` dosyalarla |
 | `TYPE` | `TYPE SITE.INI` | Metin dosyasını gösterir |
+| `MAIL [n] [/S]` | `MAIL`, `MAIL 3`, `MAIL /S` | İletişim mesajlarını listeler, n. mesajı okur, özet ([aşağıda](#mail-kutusu)) |
 | `MD` (`MKDIR`) | `MD "PHOTOS\Yeni Albüm"` | Klasör oluşturur |
 | `RD` (`RMDIR`) | `RD ESKI` | Boş klasörü siler |
 | `DELTREE [/Y]` | `DELTREE ESKI` | Klasörü içindekilerle siler (onay ister) |
@@ -371,6 +380,27 @@ dosya adıdır (`bio.png`, `mail.png`, `photos.png`, `folder.png`, `file.png`,
 `msdos.png`…). `.URL` dosyalarındaki `IconFile=` ise `assets/iPhone-Icons/`
 içinden (`Github.webp`, `Linkedin.webp`, `Twitter.webp`). Yeni bir ikon için
 dosyayı o klasöre ekleyip siteyi yeniden build etmek gerekir.
+
+---
+
+## Mail kutusu
+
+İletişim formundan gelen mesajlar admin'in DOS'tan okuyabildiği `C:\MAIL`
+klasöründe saklanır (ziyaretçiler göremez).
+
+```
+LOGIN
+You have 2 new message(s). Type MAIL to list them.
+```
+
+| Komut | İş |
+|---|---|
+| `MAIL` | Mesajları klasör klasör, numaralı listeler (tarih, gönderen, konu) |
+| `MAIL 3` | 3 numaralı mesajı okur |
+| `MAIL /S` | Son 30 günün özetini gösterir |
+
+Mesajlar normal dosyadır: `DEL` ile silinir, `MOVE` ile klasörler arasında
+taşınır, `TYPE` ile okunur.
 
 ---
 
@@ -606,8 +636,10 @@ açabilirsin; site onu görmez.
   Nginx `X-Forwarded-Host` / `X-Forwarded-Proto` gönderiyor mu?
   ([Nginx](#4-nginx))
 - **Büyük görsel yüklenmiyor (`413`):** Nginx'te `client_max_body_size 16m` yok.
-- **Mail gitmiyor:** `pm2 logs mburakbilgic` içinde `[mail]` satırlarına bak;
-  çoğunlukla uygulama şifresi ya da `NUXT_MAIL_SMTP_USER` yanlıştır.
+- **Mail gitmiyor:** önce DOS'ta `MAIL` ile mesajın geldiğine bak;
+  mesajdaki `Mailed:` satırı neden gönderilmediğini yazar. SMTP hatasında
+  `pm2 logs mburakbilgic` içindeki `[mail]` satırlarına bak; çoğunlukla
+  uygulama şifresi ya da `NUXT_MAIL_SMTP_USER` yanlıştır.
 - **Admin şifresini unuttum:** `npm run admin:hash` ile yeni hash üret,
   `.env`'e yaz, `pm2 restart mburakbilgic`.
 
@@ -630,6 +662,7 @@ site. There is no separate admin panel.
 - [Deploying to a VPS](#deploying-to-a-vps)
 - [Updates, backup and restore](#updates-backup-and-restore)
 - [Managing content with DOS](#managing-content-with-dos)
+- [Mailbox](#mailbox)
 - [Use cases](#use-cases)
 - [Troubleshooting](#troubleshooting)
 
@@ -693,6 +726,8 @@ Secrets are read only on the server; none of them uses the `NUXT_PUBLIC_` prefix
 | `NUXT_MAIL_SMTP_USER` | For mail | Sending account, e.g. `contact@yourdomain.com` |
 | `NUXT_MAIL_SMTP_PASS` | For mail | Google **app password** (not the account password) |
 | `NUXT_MAIL_TO` | No | Inbox for contact messages; defaults to the SMTP user |
+| `NUXT_MAIL_FORM_SECRET` | Recommended | Server secret for the mail form (32+ random characters, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
+| `TZ` | No | Message dates use server time; on a UTC VPS set `TZ=Europe/Istanbul` |
 | `NUXT_DB_PATH` | No | Database path; default `.data/site.db`. Uploaded files go to `files/` next to it |
 | `NUXT_PUBLIC_RESUME_PDF_URL` / `_PREVIEW_URL` | No | Fallback links used until a résumé is uploaded from DOS |
 | `NUXT_PUBLIC_PHOTOS_*` | No | Read only when seeding an empty database |
@@ -762,7 +797,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
     }
 }
 ```
@@ -776,6 +811,11 @@ The `X-Forwarded-Host` and `X-Forwarded-Proto` headers are **required**: DOS
 write commands use them to check that the request comes from the site itself.
 Without them `LOGIN` works but every write command prints
 `General failure reading drive C`.
+
+`X-Forwarded-For $remote_addr` **overwrites** whatever the client sent. Do not
+use `$proxy_add_x_forwarded_for`: it keeps a client-forged IP at the start of
+the list, and since the app reads the first IP, an attacker could show a new IP
+on every request and bypass the mail rate limits and the `LOGIN` lockout.
 
 Serve the site over HTTPS: in production the session cookie is only sent over
 HTTPS. Opened via `http://` or an IP address, `LOGIN` appears to succeed but
@@ -854,6 +894,7 @@ ADMIN C:\MBURAKBILGIC>
 | `CD` | `CD BIO\JOBS`, `CD ..`, `CD \` | Changes directory |
 | `TREE [path] [/F]` | `TREE /F` | Folder tree; `/F` includes files |
 | `TYPE` | `TYPE SITE.INI` | Prints a text file |
+| `MAIL [n] [/S]` | `MAIL`, `MAIL 3`, `MAIL /S` | Lists contact messages, reads message n, summary ([below](#mailbox)) |
 | `MD` (`MKDIR`) | `MD "PHOTOS\New Album"` | Creates a folder |
 | `RD` (`RMDIR`) | `RD OLD` | Removes an empty folder |
 | `DELTREE [/Y]` | `DELTREE OLD` | Removes a folder and everything in it (asks first) |
@@ -982,6 +1023,27 @@ written three ways:
 `IconFile=` in `.URL` files comes from `assets/iPhone-Icons/` (`Github.webp`,
 `Linkedin.webp`, `Twitter.webp`). A new icon means adding the file to that
 folder and rebuilding the site.
+
+---
+
+## Mailbox
+
+Messages from the contact form are stored in the `C:\MAIL` folder, which the
+admin reads from DOS (visitors cannot see it).
+
+```
+LOGIN
+You have 2 new message(s). Type MAIL to list them.
+```
+
+| Command | What it does |
+|---|---|
+| `MAIL` | Numbered list of the messages, folder by folder (date, sender, subject) |
+| `MAIL 3` | Reads message 3 |
+| `MAIL /S` | Summary of the last 30 days |
+
+Messages are ordinary files: delete them with `DEL`, move them between
+folders with `MOVE`, read them with `TYPE`.
 
 ---
 
@@ -1217,7 +1279,9 @@ folder with `MD BACKUP`; the site ignores it.
   does Nginx send `X-Forwarded-Host` / `X-Forwarded-Proto`?
   ([Nginx configuration](#4-nginx-configuration))
 - **Large images fail to upload (`413`):** Nginx is missing `client_max_body_size 16m`.
-- **Mail is not delivered:** check the `[mail]` lines in `pm2 logs mburakbilgic`;
-  usually the app password or `NUXT_MAIL_SMTP_USER` is wrong.
+- **Mail is not delivered:** first check with `MAIL` in DOS that the message
+  arrived; its `Mailed:` line says why it was not sent. For SMTP errors check
+  the `[mail]` lines in `pm2 logs mburakbilgic`; usually the app password or
+  `NUXT_MAIL_SMTP_USER` is wrong.
 - **Forgot the admin password:** generate a new hash with `npm run admin:hash`,
   put it in `.env`, `pm2 restart mburakbilgic`.
