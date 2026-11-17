@@ -29,10 +29,10 @@ admin paneli yoktur.
 
 ## Teknolojiler
 
-- Nuxt 3 (yalnızca SSR, Nitro sunucusu), Vue 3, Pinia, Tailwind CSS
+- Nuxt 4 (yalnızca SSR, Nitro sunucusu), Vue 3, Pinia, Tailwind CSS
 - SQLite (`better-sqlite3`) — içerik, admin oturumları
 - Nodemailer — iletişim formu Google Workspace SMTP ile gönderilir
-- Node.js **20.6 veya üstü** (Node 22 ile geliştirildi), paket yöneticisi `npm`
+- Node.js **22.22 veya üstü** (ya da 24.11+), paket yöneticisi `npm`
 
 Site `server/api` uç noktaları kullandığı için **yalnızca SSR** çalışır;
 `npm run generate` ile statik çıktı alınamaz.
@@ -669,10 +669,10 @@ site. There is no separate admin panel.
 
 ## Tech stack
 
-- Nuxt 3 (SSR only, Nitro server), Vue 3, Pinia, Tailwind CSS
+- Nuxt 4 (SSR only, Nitro server), Vue 3, Pinia, Tailwind CSS
 - SQLite (`better-sqlite3`) — content and admin sessions
 - Nodemailer — the contact form sends mail through Google Workspace SMTP
-- Node.js **20.6 or later** (developed on Node 22), package manager `npm`
+- Node.js **22.22 or later** (or 24.11+), package manager `npm`
 
 The site uses `server/api` endpoints, so it runs **SSR only**; `npm run generate`
 cannot produce a static build.
