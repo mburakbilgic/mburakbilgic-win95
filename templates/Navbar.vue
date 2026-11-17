@@ -1,5 +1,4 @@
 <script setup>
-import moment from "moment";
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import {
     useWindowsStore
@@ -7,6 +6,9 @@ import {
 import { useImagePath } from '@/composables/useImagePath'
 
 const time = ref("")
+
+// Matches the Win95 taskbar clock: zero-padded 12-hour time, e.g. "09:05 PM".
+const clockFormat = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
 
 const windowsStore = useWindowsStore()
 const { iconPath } = useImagePath()
@@ -23,7 +25,7 @@ let clockInterval = null
 
 onMounted(() => {
     const tick = () => {
-        time.value = moment().format("hh:mm A")
+        time.value = clockFormat.format(new Date())
     }
     tick()
     clockInterval = setInterval(tick, 1000)
