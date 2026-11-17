@@ -349,12 +349,14 @@ const PROTECTED_PATHS = new Set(
       .filter((dir) => dir !== CONTENT_DIRS.jobs)
       .map((dir) => `${CONTENT_HOME_PATH}\\${dir}`),
     `${CONTENT_HOME_PATH}\\${CONTENT_DIRS.bio}\\${CONTENT_DIRS.jobs}`,
+    ...MAIL_PROTECTED_PATHS,
   ].map((path) => path.toUpperCase()),
 )
 
 /**
  * Whether a canonical path is one of the directories the site builder
- * depends on; those cannot be deleted, renamed, moved or hidden.
+ * or the mailbox depends on; those cannot be deleted, renamed, moved or
+ * hidden (and `C:\MAIL` cannot be un-hidden, see the attrib endpoint).
  *
  * @param {string} canonicalPath As returned by `vfsNodePath`.
  * @returns {boolean}
@@ -389,5 +391,5 @@ export const collectContentWarnings = (canonicalPaths: string[]): string[] => {
   } catch (error) {
     warnings.push(error instanceof Error ? error.message : String(error))
   }
-  return warnings
+  return [...warnings, ...collectSpamRulesWarnings(canonicalPaths)]
 }

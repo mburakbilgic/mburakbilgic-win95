@@ -127,7 +127,16 @@ const mailContent = computed({
 })
 
 const honeypot = ref('')
+const formToken = ref('')
 const isSending = ref(false)
+
+const loadFormToken = async () => {
+    try {
+        formToken.value = (await $fetch<{ token: string }>('/api/mail/token')).token
+    } catch {
+        formToken.value = ''
+    }
+}
 const dialog = ref<{ title: string; message: string; success: boolean } | null>(null)
 
 const errorMessage = (error: unknown): string => {
@@ -147,6 +156,7 @@ const sendEmail = async () => {
                 sender: mailStore.mailSender,
                 content: mailStore.mailContent,
                 website: honeypot.value,
+                token: formToken.value,
             },
         })
         dialog.value = { title: mail.success.title, message: mail.success.message, success: true }
@@ -170,6 +180,7 @@ let isDragging = false;
 let draggableWindow = null;
 
 onMounted(() => {
+    loadFormToken()
     window.value = windowsStore.getWindowById(ComponentName)
     if (!window.value) return
     const screen = document.getElementById('screen')
